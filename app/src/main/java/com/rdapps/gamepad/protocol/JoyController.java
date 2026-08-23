@@ -110,7 +110,7 @@ public class JoyController extends AbstractDevice {
      * that fallback path's own mitigation.
      */
     private static final long LINK_MODE_QUIET_MS = 75;
-    private volatile int lastLinkMode = Integer.MIN_VALUE;
+    private volatile BluetoothCompanion.LinkMode lastLinkMode = null;
     private volatile long lastLinkModeChangeAtNanos = 0;
 
     JoyController(
@@ -323,13 +323,13 @@ public class JoyController extends AbstractDevice {
      * signal is available (see field comment above).
      */
     private boolean isLinkModeUnsettled() {
-        int mode = BluetoothCompanion.getBluetoothLinkMode();
-        if (mode == BluetoothCompanion.LINK_MODE_UNKNOWN) {
+        BluetoothCompanion.LinkMode mode = BluetoothCompanion.getBluetoothLinkMode();
+        if (mode == BluetoothCompanion.LinkMode.UNKNOWN) {
             return false;
         }
         long now = System.nanoTime();
         if (mode != lastLinkMode) {
-            boolean firstRead = lastLinkMode == Integer.MIN_VALUE;
+            boolean firstRead = lastLinkMode == null;
             lastLinkMode = mode;
             lastLinkModeChangeAtNanos = now;
             return !firstRead;
