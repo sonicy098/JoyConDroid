@@ -18,6 +18,7 @@ import com.rdapps.gamepad.device.JoystickType;
 import com.rdapps.gamepad.model.ControllerAction;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -85,14 +86,19 @@ public class ButtonMappingViewAdapter extends BaseAdapter {
             TextView valueView = view.findViewById(R.id.buttonValue);
 
             ButtonType buttonType = action.getButton();
-            Integer keyValue = actionMap.get(buttonType).getKey();
-            String keyName = Optional.ofNullable(keyValue)
-                    .map(BUTTON_NAMES::get)
-                    .orElse(null);
+            ControllerAction mappedAction = actionMap.get(buttonType);
+            List<Integer> keyValues = (mappedAction != null) ? mappedAction.getKeys() : null;
 
             nameView.setText(buttonType.name());
-            if (Objects.nonNull(keyName)) {
-                valueView.setText(keyName);
+            
+            if (Objects.nonNull(keyNameList) && !keyNameList.isEmpty()) {
+                StringBuilder keyNames = new StringBuilder();
+                for (int k : keyNameList) {
+                    keyNames.append(Optional.ofNullable(BUTTON_NAMES.get(k))
+                            .orElse(context.getString(R.string.unknown))).append(" + ");
+                }
+                String display = keyNames.substring(0, keyNames.length() - 3);
+                valueView.setText(display);
             } else {
                 valueView.setText(R.string.unknown);
             }
@@ -102,7 +108,8 @@ public class ButtonMappingViewAdapter extends BaseAdapter {
             TextView valueViewY = view.findViewById(R.id.stickYValue);
 
             ButtonType buttonType = action.getButton();
-            Integer axisValue = actionMap.get(buttonType).getAxisX();
+            ControllerAction mappedAction = actionMap.get(buttonType);
+            Integer axisValue = (mappedAction != null) ? mappedAction.getAxisX() : null;
             String axisName = Optional.ofNullable(axisValue)
                     .map(AXIS_NAMES::get)
                     .orElse(null);
@@ -148,12 +155,14 @@ public class ButtonMappingViewAdapter extends BaseAdapter {
     public void refresh(List<ControllerAction> controllerActions) {
         controllerActionList = new ArrayList<>();
         actionMap = new HashMap<>();
+        
         Arrays.stream(ButtonType.values())
-                .map(type -> new ControllerAction(type, 0))
+                .map(type -> new ControllerAction(type, new ArrayList<>()))
                 .forEach(ca -> {
                     controllerActionList.add(ca);
                     actionMap.put(ca.getButton(), ca);
                 });
+                
         Arrays.stream(JoystickType.values())
                 .map(type -> new ControllerAction(type, 0, 0, 0, 0))
                 .forEach(ca -> {
@@ -166,12 +175,15 @@ public class ButtonMappingViewAdapter extends BaseAdapter {
                 ca -> {
                     ButtonType button = ca.getButton();
                     if (Objects.nonNull(button)) {
-                        actionMap.get(button).from(ca);
+                        ControllerAction target = (ControllerAction) actionMap.get(button);
+                        if (target != null) target.from(ca);
                     } else {
-                        actionMap.get(ca.getJoystick()).from(ca);
+                        ControllerAction target = (ControllerAction) actionMap.get(ca.getJoystick());
+                        if (target != null) target.from(ca);
                     }
                 }
         );
         notifyDataSetChanged();
     }
 }
+
