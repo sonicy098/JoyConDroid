@@ -110,6 +110,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.Collections;
 
 public class ControllerActionUtils {
     public static final Map<Integer, String> BUTTON_NAMES = new HashMap<>();
@@ -456,45 +457,42 @@ public class ControllerActionUtils {
     public static final List<ControllerAction> CONTROLLER_ACTIONS = new ArrayList<>();
 
     static {
-        CONTROLLER_ACTIONS.add(new ControllerAction(LEFT, KEYCODE_DPAD_LEFT));
-        CONTROLLER_ACTIONS.add(new ControllerAction(RIGHT, KEYCODE_DPAD_RIGHT));
-        CONTROLLER_ACTIONS.add(new ControllerAction(UP, KEYCODE_DPAD_UP));
-        CONTROLLER_ACTIONS.add(new ControllerAction(DOWN, KEYCODE_DPAD_DOWN));
-        CONTROLLER_ACTIONS.add(new ControllerAction(B, KEYCODE_BUTTON_A));
-        CONTROLLER_ACTIONS.add(new ControllerAction(A, KEYCODE_BUTTON_B));
-        CONTROLLER_ACTIONS.add(new ControllerAction(Y, KEYCODE_BUTTON_X));
-        CONTROLLER_ACTIONS.add(new ControllerAction(X, KEYCODE_BUTTON_Y));
-        CONTROLLER_ACTIONS.add(new ControllerAction(R, KEYCODE_BUTTON_R1));
-        CONTROLLER_ACTIONS.add(new ControllerAction(ZR, KEYCODE_BUTTON_R2));
-        CONTROLLER_ACTIONS.add(new ControllerAction(RIGHT_SR, KEYCODE_BUTTON_1));
-        CONTROLLER_ACTIONS.add(new ControllerAction(LEFT_SR, KEYCODE_BUTTON_2));
-        CONTROLLER_ACTIONS.add(new ControllerAction(L, KEYCODE_BUTTON_L1));
-        CONTROLLER_ACTIONS.add(new ControllerAction(ZL, KEYCODE_BUTTON_L2));
-        CONTROLLER_ACTIONS.add(new ControllerAction(RIGHT_SL, KEYCODE_BUTTON_3));
-        CONTROLLER_ACTIONS.add(new ControllerAction(LEFT_SL, KEYCODE_BUTTON_4));
-        CONTROLLER_ACTIONS.add(new ControllerAction(PLUS, KEYCODE_BUTTON_START));
-        CONTROLLER_ACTIONS.add(new ControllerAction(MINUS, KEYCODE_BUTTON_SELECT));
-        CONTROLLER_ACTIONS.add(new ControllerAction(HOME, KEYCODE_BUTTON_MODE));
-        CONTROLLER_ACTIONS.add(new ControllerAction(CAPTURE, KEYCODE_BUTTON_Z));
-        CONTROLLER_ACTIONS.add(new ControllerAction(LEFT_STICK, KEYCODE_BUTTON_THUMBL));
-        CONTROLLER_ACTIONS.add(new ControllerAction(RIGHT_STICK, KEYCODE_BUTTON_THUMBR));
+        CONTROLLER_ACTIONS.add(new ControllerAction(LEFT, Collections.singletonList(KEYCODE_DPAD_LEFT)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(RIGHT, Collections.singletonList(KEYCODE_DPAD_RIGHT)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(UP, Collections.singletonList(KEYCODE_DPAD_UP)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(DOWN, Collections.singletonList(KEYCODE_DPAD_DOWN)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(B, Collections.singletonList(KEYCODE_BUTTON_A)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(A, Collections.singletonList(KEYCODE_BUTTON_B)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(Y, Collections.singletonList(KEYCODE_BUTTON_X)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(X, Collections.singletonList(KEYCODE_BUTTON_Y)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(R, Collections.singletonList(KEYCODE_BUTTON_R1)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(ZR, Collections.singletonList(KEYCODE_BUTTON_R2)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(RIGHT_SR, Collections.singletonList(KEYCODE_BUTTON_1)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(LEFT_SR, Collections.singletonList(KEYCODE_BUTTON_2)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(L, Collections.singletonList(KEYCODE_BUTTON_L1)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(ZL, Collections.singletonList(KEYCODE_BUTTON_L2)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(RIGHT_SL, Collections.singletonList(KEYCODE_BUTTON_3)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(LEFT_SL, Collections.singletonList(KEYCODE_BUTTON_4)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(PLUS, Collections.singletonList(KEYCODE_BUTTON_START)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(MINUS, Collections.singletonList(KEYCODE_BUTTON_SELECT)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(HOME, Collections.singletonList(KEYCODE_BUTTON_MODE)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(CAPTURE, Collections.singletonList(KEYCODE_BUTTON_Z)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(LEFT_STICK, Collections.singletonList(KEYCODE_BUTTON_THUMBL)));
+        CONTROLLER_ACTIONS.add(new ControllerAction(RIGHT_STICK, Collections.singletonList(KEYCODE_BUTTON_THUMBR)));
         CONTROLLER_ACTIONS.add(new ControllerAction(RIGHT_JOYSTICK, AXIS_Z, 1, AXIS_RZ, -1));
         CONTROLLER_ACTIONS.add(new ControllerAction(LEFT_JOYSTICK, AXIS_X, 1, AXIS_Y, -1));
     }
 
-
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    public static Map<Integer, ButtonType> getButtonMapping(Context context) {
+    public static Map<List<Integer>, ButtonType> getButtonMapping(Context context) {
         return getButtonMapping(getControllerActions(context));
     }
 
-    public static Map<Integer, ButtonType> getButtonMapping(
-            List<ControllerAction> controllerActions) {
-        return controllerActions
-                .stream()
+    public static Map<List<Integer>, ButtonType> getButtonMapping(List<ControllerAction> controllerActions) {
+        return controllerActions.stream()
                 .filter(ca -> ca.getType() == BUTTON)
-                .collect(Collectors.toMap(ControllerAction::getKey, ControllerAction::getButton));
+                .collect(Collectors.toMap(ControllerAction::getKeys, ControllerAction::getButton));
     }
 
     public static Map<Pair<Integer, Integer>, ButtonType> getAxisMapping(Context context) {

@@ -56,9 +56,11 @@ public abstract class ControllerFragment extends Fragment {
     @Setter
     protected JoyController device;
 
-    private Map<Integer, ButtonType> buttonMap;
+    private Map<List<Integer>, ButtonType> buttonMap;
     private Map<Pair<Integer, Integer>, ButtonType> axisMap;
     private Map<JoystickType, ControllerAction> joystickMap;
+    
+    private final java.util.Set<Integer> activeKeys = new java.util.HashSet<>();
 
     protected Boolean hapticFeedBackEnabled;
     protected Vibrator vibrator;
@@ -124,7 +126,7 @@ public abstract class ControllerFragment extends Fragment {
         buttonMap = getButtonMapping(getContext());
     }
 
-    public Map<Integer, ButtonType> getButtonMap() {
+    public Map<List<Integer>, ButtonType> getButtonMap() {
         if (Objects.isNull(buttonMap)) {
             buttonMap = getButtonMapping(getContext());
         }
@@ -195,22 +197,27 @@ public abstract class ControllerFragment extends Fragment {
     public abstract boolean reverseJoystickXy();
 
     public boolean handleKey(int keyCode, KeyEvent keyEvent) {
-        MotionEvent event;
         if (keyEvent.getAction() == KeyEvent.ACTION_DOWN) {
-            event = getTouchDownEvent();
+            activeKeys.add(keyCode);
         } else if (keyEvent.getAction() == KeyEvent.ACTION_UP) {
-            event = getTouchUpEvent();
+            activeKeys.remove(keyCode);
         } else {
             return false;
         }
 
-        Map<Integer, ButtonType> buttonMap = getButtonMap();
-        ButtonType buttonType = buttonMap.get(keyCode);
-        if (Objects.isNull(buttonType)) {
-            return false;
-        }
+        MotionEvent event = (keyEvent.getAction() == KeyEvent.ACTION_DOWN) ? getTouchDownEvent() : getTouchUpEvent();
 
-        return dispatchButton(keyEvent, event, buttonType);
+        // Ambil daftar aksi langsung untuk memvalidasi kombinasi tombol
+        java.util.List<ControllerAction> actions = com.rdapps.gamepad.util.ControllerActionUtils.getControllerActions(getContext());
+        
+        for (ControllerAction action : actions) {
+            if (action.getType() == ControllerAction.Type.BUTTON && action.getKeys() != null && !action.getKeys().isEmpty()) {
+                if (activeKeys.containsAll(action.getKeys())) {
+                    return dispatchButton(keyEvent, event, action.getButton());
+                }
+            }
+        }
+        return false;
     }
 
     private boolean dispatchButton(KeyEvent keyEvent, MotionEvent event, ButtonType buttonType) {

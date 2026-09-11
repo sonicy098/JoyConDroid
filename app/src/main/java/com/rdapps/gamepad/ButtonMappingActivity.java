@@ -45,7 +45,7 @@ public class ButtonMappingActivity extends AppCompatActivity
     private ButtonMappingAlertDialog alertDialog;
     private ButtonType buttonType;
 
-    private int keyValue;
+    private List<Integer> keyValues;
     private int axisValue;
     private int axisDirection;
 
@@ -84,7 +84,7 @@ public class ButtonMappingActivity extends AppCompatActivity
         listView.setAdapter(adapter);
         listView.setClickable(true);
         listView.setOnItemClickListener(this);
-        keyValue = -1;
+        keyValues = new ArrayList<>();
         axisValue = -1;
         axisDirection = 0;
 
@@ -150,23 +150,17 @@ public class ButtonMappingActivity extends AppCompatActivity
     private void alertCancel(DialogInterface dialogInterface) {
         alertDialog = null;
         buttonType = null;
-        keyValue = -1;
+        keyValues.clear();
         axisValue = -1;
         axisDirection = 0;
     }
 
-    private void remap(ButtonType buttonType, int keyValue) {
+    private void remap(ButtonType buttonType, List<Integer> keys) {
         List<ControllerAction> newActions = new ArrayList<>(controllerActions);
-        for (ControllerAction controllerAction : controllerActions) {
-            if (controllerAction.getKey() == keyValue) {
-                newActions.remove(controllerAction);
-            }
-            if (controllerAction.getButton() == buttonType) {
-                newActions.remove(controllerAction);
-            }
-        }
-        newActions.add(new ControllerAction(buttonType, keyValue));
-        //ControllerActionUtils.setControllerActions(this, newActions);
+        newActions.removeIf(action -> action.getKeys() != null && action.getKeys().equals(keys));
+        newActions.removeIf(action -> action.getButton() == buttonType);
+        
+        newActions.add(new ControllerAction(buttonType, new ArrayList<>(keys)));
         this.controllerActions = newActions;
         this.adapter.refresh(controllerActions);
     }
@@ -192,16 +186,22 @@ public class ButtonMappingActivity extends AppCompatActivity
         log("Key", event.toString());
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             if (Objects.nonNull(buttonType)) {
-                if (keyCode != keyValue) {
-                    String keyName = Optional.ofNullable(BUTTON_NAMES.get(keyCode))
-                            .orElse(getString(R.string.unknown));
-                    keyValue = keyCode;
-                    alertDialog.setMessage(
-                            this.getString(R.string.repress_to_map, buttonType.name(), keyName));
-                } else {
-                    remap(buttonType, keyValue);
-                    alertDialog.cancel();
+                if (!keyValues.contains(keyCode)) {
+                    keyValues.add(keyCode);
+                    StringBuilder keyNames = new StringBuilder();
+                    for (int k : keyValues) {
+                        keyNames.append(Optional.ofNullable(BUTTON_NAMES.get(k))
+                                .orElse(getString(R.string.unknown))).append(" + ");
+                    }
+                    String display = keyNames.substring(0, keyNames.length() - 3);
+                    alertDialog.setMessage(getString(R.string.repress_to_map, buttonType.name(), display) + "\n(Lepas tombol untuk simpan)");
                 }
+                return true;
+            }
+        } else if (event.getAction() == KeyEvent.ACTION_UP) {
+            if (Objects.nonNull(buttonType) && !keyValues.isEmpty()) {
+                remap(buttonType, keyValues);
+                alertDialog.cancel();
                 return true;
             }
         }

@@ -5,6 +5,8 @@ import com.rdapps.gamepad.device.ButtonType;
 import com.rdapps.gamepad.device.JoystickType;
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -19,7 +21,7 @@ public class ControllerAction implements Serializable {
 
     private Type type;
 
-    private int key;
+    private List<Integer> keys = new ArrayList<>();
     private ButtonType button;
 
     private JoystickType joystick;
@@ -34,9 +36,9 @@ public class ControllerAction implements Serializable {
         JOYSTICK
     }
 
-    public ControllerAction(ButtonType button, int key) {
+    public ControllerAction(ButtonType button, List<Integer> keys) {
         this.type = Type.BUTTON;
-        this.key = key;
+        this.keys = keys;
         this.button = button;
     }
 
@@ -60,7 +62,7 @@ public class ControllerAction implements Serializable {
 
     public void from(ControllerAction ca) {
         this.type = ca.type;
-        this.key = ca.key;
+        this.keys = (ca.keys != null) ? new ArrayList<>(ca.keys) : new ArrayList<>();
         this.button = ca.button;
 
         this.joystick = ca.joystick;
