@@ -94,6 +94,8 @@ public class ControllerActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         if (!BuildConfig.VM) {
             requestWindowFeature(Window.FEATURE_NO_TITLE);
