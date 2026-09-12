@@ -17,8 +17,6 @@ import com.rdapps.gamepad.device.ButtonType;
 import com.rdapps.gamepad.device.JoystickType;
 import com.rdapps.gamepad.model.ControllerAction;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,8 +32,8 @@ public class ButtonMappingViewAdapter extends BaseAdapter {
     private Map<JoystickType, ControllerAction> joysticks;
 
     public ButtonMappingViewAdapter(Context context, List<ControllerAction> controllerActions) {
-        this.refresh(controllerActions);
         this.layoutInflater = LayoutInflater.from(context);
+        this.refresh(controllerActions);
     }
 
     @Override
@@ -80,7 +78,6 @@ public class ButtonMappingViewAdapter extends BaseAdapter {
             return view;
         }
 
-
         if (action.getType() == BUTTON) {
             TextView nameView = view.findViewById(R.id.buttonName);
             TextView valueView = view.findViewById(R.id.buttonValue);
@@ -91,11 +88,11 @@ public class ButtonMappingViewAdapter extends BaseAdapter {
 
             nameView.setText(buttonType.name());
             
-            if (Objects.nonNull(keyNameList) && !keyNameList.isEmpty()) {
+            if (keyValues != null && !keyValues.isEmpty()) {
                 StringBuilder keyNames = new StringBuilder();
-                for (int k : keyNameList) {
+                for (int k : keyValues) {
                     keyNames.append(Optional.ofNullable(BUTTON_NAMES.get(k))
-                            .orElse(context.getString(R.string.unknown))).append(" + ");
+                            .orElse(parent.getContext().getString(R.string.unknown))).append(" + ");
                 }
                 String display = keyNames.substring(0, keyNames.length() - 3);
                 valueView.setText(display);
@@ -156,33 +153,33 @@ public class ButtonMappingViewAdapter extends BaseAdapter {
         controllerActionList = new ArrayList<>();
         actionMap = new HashMap<>();
         
-        Arrays.stream(ButtonType.values())
-                .map(type -> new ControllerAction(type, new ArrayList<>()))
-                .forEach(ca -> {
-                    controllerActionList.add(ca);
-                    actionMap.put(ca.getButton(), ca);
-                });
-                
-        Arrays.stream(JoystickType.values())
-                .map(type -> new ControllerAction(type, 0, 0, 0, 0))
-                .forEach(ca -> {
-                    controllerActionList.add(ca);
-                    actionMap.put(ca.getJoystick(), ca);
-                });
+        for (ButtonType type : ButtonType.values()) {
+            ControllerAction ca = new ControllerAction(type, new ArrayList<>());
+            controllerActionList.add(ca);
+            actionMap.put(ca.getButton(), ca);
+        }
+        
+        for (JoystickType type : JoystickType.values()) {
+            ControllerAction ca = new ControllerAction(type, 0, 0, 0, 0);
+            controllerActionList.add(ca);
+            actionMap.put(ca.getJoystick(), ca);
+        }
 
         this.joysticks = getJoystickMapping(controllerActions);
-        controllerActions.forEach(
-                ca -> {
-                    ButtonType button = ca.getButton();
-                    if (Objects.nonNull(button)) {
-                        ControllerAction target = (ControllerAction) actionMap.get(button);
-                        if (target != null) target.from(ca);
-                    } else {
-                        ControllerAction target = (ControllerAction) actionMap.get(ca.getJoystick());
-                        if (target != null) target.from(ca);
-                    }
+        for (ControllerAction ca : controllerActions) {
+            ButtonType button = ca.getButton();
+            if (Objects.nonNull(button)) {
+                ControllerAction target = actionMap.get(button);
+                if (target != null) {
+                    target.from(ca);
                 }
-        );
+            } else {
+                ControllerAction target = actionMap.get(ca.getJoystick());
+                if (target != null) {
+                    target.from(ca);
+                }
+            }
+        }
         notifyDataSetChanged();
     }
 }
