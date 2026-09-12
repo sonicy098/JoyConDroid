@@ -6,6 +6,7 @@ import static com.rdapps.gamepad.util.ControllerActionUtils.AXIS_NAMES;
 import static com.rdapps.gamepad.util.ControllerActionUtils.BUTTON_NAMES;
 import static com.rdapps.gamepad.util.ControllerActionUtils.CONTROLLER_ACTIONS;
 import static com.rdapps.gamepad.util.ControllerActionUtils.getControllerActions;
+import com.rdapps.gamepad.util.PreferenceUtils;
 
 import android.content.DialogInterface;
 import android.content.Intent;
