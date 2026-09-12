@@ -2,7 +2,17 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    tools:context=".MainActivity">
+    tools:context=".MainActivity"> <!-- Pastikan tools:context mengarah ke ButtonMappingActivity -->
+
+    <item
+        android:id="@+id/action_change_profile"
+        android:title="Load Profile"
+        app:showAsAction="never" />
+        
+    <item
+        android:id="@+id/action_save_profile_as"
+        android:title="Save Profile As"
+        app:showAsAction="never" />
 
     <item
         android:id="@+id/action_reset"

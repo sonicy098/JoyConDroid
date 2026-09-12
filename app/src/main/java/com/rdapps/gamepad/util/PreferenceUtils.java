@@ -12,6 +12,10 @@ import java.util.Optional;
 
 public class PreferenceUtils {
     private static final String TAG = PreferenceUtils.class.getName();
+    
+    private static final String ACTIVE_PROFILE_NAME = "ACTIVE_PROFILE_NAME";
+    public static final String DEFAULT_PROFILE = "Default Profile";
+    private static final String PROFILES_LIST = "PROFILES_LIST";
 
     private static final String ORIGINAL_NAME = "ORIGINAL_NAME";
     private static final String DO_NOT_SHOW = "DO_NOT_SHOW";
@@ -79,17 +83,52 @@ public class PreferenceUtils {
                 .apply();
     }
 
-    static String getButtonMapping(Context context) {
+    public static java.util.Set<String> getProfiles(Context context) {
+        java.util.Set<String> defaultProfiles = new java.util.HashSet<>();
+        defaultProfiles.add(DEFAULT_PROFILE);
         return PreferenceManager.getDefaultSharedPreferences(context)
-                .getString(BUTTON_MAPPING, null);
+                .getStringSet(PROFILES_LIST, defaultProfiles);
     }
 
-    static void setButtonMapping(Context context, String buttonMapping) {
+    public static void setProfiles(Context context, java.util.Set<String> profiles) {
         PreferenceManager.getDefaultSharedPreferences(context)
                 .edit()
-                .putString(BUTTON_MAPPING, buttonMapping)
+                .putStringSet(PROFILES_LIST, profiles)
                 .apply();
     }
+    
+    // Mengambil profil yang sedang aktif
+    public static String getActiveProfile(Context context) {
+        return PreferenceManager.getDefaultSharedPreferences(context)
+                .getString(ACTIVE_PROFILE_NAME, DEFAULT_PROFILE);
+    }
+
+    // Mengganti profil yang sedang aktif
+    public static void setActiveProfile(Context context, String profileName) {
+        PreferenceManager.getDefaultSharedPreferences(context)
+                .edit()
+                .putString(ACTIVE_PROFILE_NAME, profileName)
+                .apply();
+    }
+
+    // getButtonMapping sekarang mengambil dari profil yang aktif
+    public static String getButtonMapping(Context context) {
+        String profileName = getActiveProfile(context);
+        return PreferenceManager.getDefaultSharedPreferences(context)
+                .getString(BUTTON_MAPPING + "_" + profileName, null);
+    }
+
+    // setButtonMapping menyimpan ke profil yang aktif
+    public static void setButtonMapping(Context context, String buttonMapping) {
+        String profileName = getActiveProfile(context);
+        PreferenceManager.getDefaultSharedPreferences(context)
+                .edit()
+                .putString(BUTTON_MAPPING + "_" + profileName, buttonMapping)
+                .apply();
+    }
+    
+    // Opsional: Untuk mendapatkan daftar profil yang ada, 
+    // Anda bisa menyimpan daftar nama profil di preference terpisah sebagai Set<String> atau JSON List.
 
     public static String getBluetoothAddress(Context context) {
         return PreferenceManager.getDefaultSharedPreferences(context)

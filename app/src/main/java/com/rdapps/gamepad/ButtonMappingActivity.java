@@ -103,13 +103,71 @@ public class ButtonMappingActivity extends AppCompatActivity
         int id = item.getItemId();
 
         if (id == R.id.action_reset) {
-            //ControllerActionUtils.setControllerActions(this, null);
             controllerActions = CONTROLLER_ACTIONS;
             Optional.ofNullable(adapter).ifPresent(adapter -> adapter.refresh(controllerActions));
             return true;
+        } else if (id == R.id.action_change_profile) {
+            showLoadProfileDialog();
+            return true;
+        } else if (id == R.id.action_save_profile_as) {
+            showSaveProfileAsDialog();
+            return true;
         }
 
-        return false;
+        return super.onOptionsItemSelected(item);
+    }
+    
+    private void showSaveProfileAsDialog() {
+        final android.widget.EditText input = new android.widget.EditText(this);
+        input.setHint("Masukkan Nama Profil");
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Simpan Profil Sebagai")
+                .setView(input)
+                .setPositiveButton("Simpan", (dialog, which) -> {
+                    String profileName = input.getText().toString().trim();
+                    if (!profileName.isEmpty()) {
+                        // Simpan nama profil ke daftar
+                        java.util.Set<String> profiles = new java.util.HashSet<>(PreferenceUtils.getProfiles(this));
+                        profiles.add(profileName);
+                        PreferenceUtils.setProfiles(this, profiles);
+
+                        // Set profil ini sebagai profil aktif
+                        PreferenceUtils.setActiveProfile(this, profileName);
+
+                        // Simpan konfigurasi tombol saat ini ke profil tersebut
+                        ControllerActionUtils.setControllerActions(this, controllerActions);
+
+                        Toast.makeText(this, "Profil tersimpan: " + profileName, Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Batal", null)
+                .show();
+    }
+
+    private void showLoadProfileDialog() {
+        java.util.Set<String> profileSet = PreferenceUtils.getProfiles(this);
+        final String[] profiles = profileSet.toArray(new String[0]);
+
+        if (profiles.length == 0) {
+            Toast.makeText(this, "Tidak ada profil tersimpan", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Pilih Profil")
+                .setItems(profiles, (dialog, which) -> {
+                    String selectedProfile = profiles[which];
+                    PreferenceUtils.setActiveProfile(this, selectedProfile);
+
+                    // Muat ulang daftar aksi berdasarkan profil yang dipilih
+                    controllerActions = ControllerActionUtils.getControllerActions(this);
+                    adapter.refresh(controllerActions);
+
+                    Toast.makeText(this, "Profil dimuat: " + selectedProfile, Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Batal", null)
+                .show();
     }
 
     @Override
