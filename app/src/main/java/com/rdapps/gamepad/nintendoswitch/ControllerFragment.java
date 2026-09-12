@@ -198,27 +198,46 @@ public abstract class ControllerFragment extends Fragment {
     public abstract boolean reverseJoystickXy();
 
     public boolean handleKey(int keyCode, KeyEvent keyEvent) {
-        if (keyEvent.getAction() == KeyEvent.ACTION_DOWN) {
-            activeKeys.add(keyCode);
-        } else if (keyEvent.getAction() == KeyEvent.ACTION_UP) {
-            activeKeys.remove(keyCode);
-        } else {
+        boolean isDown = keyEvent.getAction() == KeyEvent.ACTION_DOWN;
+        boolean isUp = keyEvent.getAction() == KeyEvent.ACTION_UP;
+
+        // Abaikan event selain pencet (DOWN) atau lepas (UP)
+        if (!isDown && !isUp) {
             return false;
         }
 
-        MotionEvent event = (keyEvent.getAction() == KeyEvent.ACTION_DOWN) ? getTouchDownEvent() : getTouchUpEvent();
+        boolean handled = false;
+        MotionEvent event = isDown ? getTouchDownEvent() : getTouchUpEvent();
+        Map<List<Integer>, ButtonType> map = getButtonMap();
 
-        // Ambil daftar aksi langsung untuk memvalidasi kombinasi tombol
-        java.util.List<ControllerAction> actions = com.rdapps.gamepad.util.ControllerActionUtils.getControllerActions(getContext());
-        
-        for (ControllerAction action : actions) {
-            if (action.getType() == ControllerAction.Type.BUTTON && action.getKeys() != null && !action.getKeys().isEmpty()) {
-                if (activeKeys.containsAll(action.getKeys())) {
-                    return dispatchButton(keyEvent, event, action.getButton());
+        if (isDown) {
+            // Tambahkan key yang ditekan ke daftar activeKeys
+            activeKeys.add(keyCode);
+            
+            // Cek semua kombinasi, jika ada yang terpenuhi seluruhnya, kirim ACTION_DOWN
+            for (Map.Entry<List<Integer>, ButtonType> entry : map.entrySet()) {
+                List<Integer> keys = entry.getKey();
+                if (keys != null && !keys.isEmpty() && activeKeys.containsAll(keys)) {
+                    handled |= dispatchButton(keyEvent, event, entry.getValue());
                 }
             }
+        } else if (isUp) {
+            // Untuk aksi lepas, cari semua pemetaan yang mengandung tombol yang baru dilepas
+            for (Map.Entry<List<Integer>, ButtonType> entry : map.entrySet()) {
+                List<Integer> keys = entry.getKey();
+                if (keys != null && keys.contains(keyCode)) {
+                    // Validasi: Apakah sebelum tombol ini dilepas, kombinasinya dalam status terpenuhi (ditekan)?
+                    // Jika iya, berarti kita harus melepas (ACTION_UP) tombol UI tersebut
+                    if (activeKeys.containsAll(keys)) {
+                        handled |= dispatchButton(keyEvent, event, entry.getValue());
+                    }
+                }
+            }
+            // Baru hapus tombol dari daftar setelah event UP berhasil didistribusikan
+            activeKeys.remove(keyCode);
         }
-        return false;
+
+        return handled;
     }
 
     private boolean dispatchButton(KeyEvent keyEvent, MotionEvent event, ButtonType buttonType) {
