@@ -38,7 +38,7 @@ public class CustomUiActivity extends AppCompatActivity implements Callback<List
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        
         setContentView(R.layout.activity_custom_ui);
 
         ListView customUiView = findViewById(R.id.customUIList);
