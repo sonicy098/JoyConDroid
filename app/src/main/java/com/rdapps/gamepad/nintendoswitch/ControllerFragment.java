@@ -62,6 +62,7 @@ public abstract class ControllerFragment extends Fragment {
     private Map<JoystickType, ControllerAction> joystickMap;
     
     private final java.util.Set<Integer> activeKeys = new java.util.HashSet<>();
+    private final java.util.Set<ButtonType> activeVirtualButtons = new java.util.HashSet<>();
 
     protected Boolean hapticFeedBackEnabled;
     protected Vibrator vibrator;
@@ -206,35 +207,62 @@ public abstract class ControllerFragment extends Fragment {
             return false;
         }
 
-        boolean handled = false;
-        MotionEvent event = isDown ? getTouchDownEvent() : getTouchUpEvent();
+        // 1. Update status riwayat tombol fisik 
+        if (isDown) {
+            activeKeys.add(keyCode);
+        } else {
+            activeKeys.remove(keyCode);
+        }
+
+        // 2. Hitung tombol virtual apa saja yang seharusnya aktif saat ini
+        java.util.Set<ButtonType> desiredButtons = new java.util.HashSet<>();
+        java.util.Set<Integer> consumedKeys = new java.util.HashSet<>();
         Map<List<Integer>, ButtonType> map = getButtonMap();
 
-        if (isDown) {
-            // Tambahkan key yang ditekan ke daftar activeKeys
-            activeKeys.add(keyCode);
-            
-            // Cek semua kombinasi, jika ada yang terpenuhi seluruhnya, kirim ACTION_DOWN
-            for (Map.Entry<List<Integer>, ButtonType> entry : map.entrySet()) {
-                List<Integer> keys = entry.getKey();
-                if (keys != null && !keys.isEmpty() && activeKeys.containsAll(keys)) {
-                    handled |= dispatchButton(keyEvent, event, entry.getValue());
-                }
-            }
-        } else if (isUp) {
-            // Untuk aksi lepas, cari semua pemetaan yang mengandung tombol yang baru dilepas
-            for (Map.Entry<List<Integer>, ButtonType> entry : map.entrySet()) {
-                List<Integer> keys = entry.getKey();
-                if (keys != null && keys.contains(keyCode)) {
-                    // Validasi: Apakah sebelum tombol ini dilepas, kombinasinya dalam status terpenuhi (ditekan)?
-                    // Jika iya, berarti kita harus melepas (ACTION_UP) tombol UI tersebut
-                    if (activeKeys.containsAll(keys)) {
-                        handled |= dispatchButton(keyEvent, event, entry.getValue());
+        // Urutkan mapping dari yang butuh kombinasi terbanyak ke tersedikit (misal: 3 tombol > 2 tombol > 1 tombol)
+        List<Map.Entry<List<Integer>, ButtonType>> sortedEntries = new java.util.ArrayList<>(map.entrySet());
+        sortedEntries.sort((e1, e2) -> {
+            int size1 = e1.getKey() == null ? 0 : e1.getKey().size();
+            int size2 = e2.getKey() == null ? 0 : e2.getKey().size();
+            return Integer.compare(size2, size1);
+        });
+
+        for (Map.Entry<List<Integer>, ButtonType> entry : sortedEntries) {
+            List<Integer> keys = entry.getKey();
+            if (keys != null && !keys.isEmpty() && activeKeys.containsAll(keys)) {
+                // Pastikan tombol-tombol fisik penyusunnya belum dipakai oleh kombinasi yang lebih panjang
+                boolean alreadyConsumed = false;
+                for (Integer k : keys) {
+                    if (consumedKeys.contains(k)) {
+                        alreadyConsumed = true;
+                        break;
                     }
                 }
+                
+                // Jika belum terpakai, aktifkan tombol virtual kombinasi ini, lalu tandai fisiknya sebagai terpakai
+                if (!alreadyConsumed) {
+                    desiredButtons.add(entry.getValue());
+                    consumedKeys.addAll(keys);
+                }
             }
-            // Baru hapus tombol dari daftar setelah event UP berhasil didistribusikan
-            activeKeys.remove(keyCode);
+        }
+
+        boolean handled = false;
+
+        // 3. Lepas (UP) tombol virtual yang sebelumnya tertekan, tapi sekarang sudah ditarik/tergantikan kombinasi
+        for (ButtonType btn : new java.util.HashSet<>(activeVirtualButtons)) {
+            if (!desiredButtons.contains(btn)) {
+                handled |= dispatchButton(new KeyEvent(KeyEvent.ACTION_UP, 0), getTouchUpEvent(), btn);
+                activeVirtualButtons.remove(btn);
+            }
+        }
+
+        // 4. Tekan (DOWN) tombol virtual baru yang masuk kualifikasi
+        for (ButtonType btn : desiredButtons) {
+            if (!activeVirtualButtons.contains(btn)) {
+                handled |= dispatchButton(new KeyEvent(KeyEvent.ACTION_DOWN, 0), getTouchDownEvent(), btn);
+                activeVirtualButtons.add(btn);
+            }
         }
 
         return handled;
