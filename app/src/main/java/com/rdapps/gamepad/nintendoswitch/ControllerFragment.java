@@ -477,13 +477,21 @@ public abstract class ControllerFragment extends Fragment {
         }
         SensorManager sensorManager = getSensorManager();
         if (Objects.nonNull(sensorManager)) {
+            // Coba ambil hardware gyro standar
             senGyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-            if (Objects.nonNull(senGyroscope)
-                    && device.isGyroscopeEnabled()
-                    && PreferenceUtils.getGyroscopeEnabled(getContext())
-            ) {
-                sensorManager.registerListener(
-                        device, senGyroscope, SwitchController.SAMPLING_INTERVAL);
+            
+            // Jika null (biasanya karena software gyro), coba ambil versi Uncalibrated
+            if (senGyroscope == null) {
+                senGyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE_UNCALIBRATED);
+            }
+
+            if (senGyroscope != null) {
+                if (device.isGyroscopeEnabled() && PreferenceUtils.getGyroscopeEnabled(getContext())) {
+                    sensorManager.registerListener(device, senGyroscope, SwitchController.SAMPLING_INTERVAL);
+                }
+            } else {
+                // Munculkan peringatan agar Anda tahu bahwa OS benar-benar memblokir akses gyro
+                android.widget.Toast.makeText(getContext(), "Gyroscope tidak terdeteksi oleh sistem OS!", android.widget.Toast.LENGTH_LONG).show();
             }
         }
     }
