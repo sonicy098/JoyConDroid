@@ -35,6 +35,14 @@ public class PreferenceUtils {
     private static final String HAPTIC_FEEDBACK_ENABLED = "HAPTIC_FEEDBACK_ENABLED";
 
     private static final String PACKET_RATE = "PACKET_RATE";
+    
+    private static final String SENSOR_MULTIPLIER = "SENSOR_MULTIPLIER";
+
+    public static int getSensorMultiplier(Context context) {
+        // Default adalah 1 (sensor murni tanpa amplifikasi)
+        return PreferenceManager.getDefaultSharedPreferences(context)
+                .getInt(SENSOR_MULTIPLIER, 1);
+    }
 
     public static void saveOriginalName(Context context, String name) {
         Optional<String> originalName = getOriginalName(context);

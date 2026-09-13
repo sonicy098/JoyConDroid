@@ -303,10 +303,11 @@ public class JoyController extends AbstractDevice {
     @Override
     public void onSensorChanged(SensorEvent event) {
         if (Objects.nonNull(event) && Objects.nonNull(event.sensor)) {
+        	int multiplier = PreferenceUtils.getSensorMultiplier(context);
             if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER && isAccelerometerEnabled()) {
-                accelerometerEvents.add(AccelerometerEvent.createFromSensorEvent(event));
+                accelerometerEvents.add(AccelerometerEvent.createFromSensorEvent(event, multiplier));
             } else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE && isGyroscopeEnabled()) {
-                gyroscopeEvents.add(GyroscopeEvent.createFromSensorEvent(event));
+                gyroscopeEvents.add(GyroscopeEvent.createFromSensorEvent(event, multiplier));
             }
         }
     }

@@ -13,6 +13,14 @@
             android:defaultValue="true"
             android:key="ENABLED_GYROSCOPE"
             android:title="@string/enable_gyroscope" />
+            
+        <SeekBarPreference
+	        android:key="SENSOR_MULTIPLIER"
+	        android:title="Sensor Sensitivity Multiplier"
+	        android:summary="Tingkatkan jika Switch Let's Go Pikachu tidak mendeteksi ayunan (Default: 1)"
+	        android:defaultValue="1"
+	        app:min="1"
+	        android:max="10" />
 
         <SwitchPreferenceCompat
             android:defaultValue="false"
