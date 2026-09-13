@@ -29,6 +29,7 @@ import com.rdapps.gamepad.sensor.GyroscopeEvent;
 import com.rdapps.gamepad.util.BluetoothCompanion;
 import com.rdapps.gamepad.util.ByteUtils;
 import com.rdapps.gamepad.util.ThreadUtil;
+import com.rdapps.gamepad.util.PreferenceUtils;
 import com.rdapps.gamepad.vibrator.RumbleData;
 import java.util.Objects;
 import java.util.Queue;
