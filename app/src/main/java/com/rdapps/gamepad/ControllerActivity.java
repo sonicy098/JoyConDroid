@@ -24,6 +24,8 @@ import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.Window;
@@ -72,6 +74,8 @@ public class ControllerActivity extends AppCompatActivity {
     private BluetoothControllerService bluetoothControllerService;
 
     private boolean askingDiscoverable;
+    
+    private boolean doubleBackToExitPressedOnce = false;
 
     private final ActivityResultLauncher<Intent> requestBtEnableResultLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
@@ -164,6 +168,24 @@ public class ControllerActivity extends AppCompatActivity {
         registerReceiver(bluetoothBroadcastReceiver, intentFilter);
     }
 
+    @Override
+    public void onBackPressed() {
+        // Jika tombol sudah ditekan sekali dalam 2 detik terakhir, izinkan keluar
+        if (doubleBackToExitPressedOnce) {
+            super.onBackPressed();
+            return;
+        }
+
+        // Jika baru ditekan sekali, tahan layar dan munculkan peringatan
+        this.doubleBackToExitPressedOnce = true;
+        Toast.makeText(this, "Tekan KEMBALI sekali lagi untuk keluar dari Gamepad", Toast.LENGTH_SHORT).show();
+
+        // Jalankan timer untuk mereset status kembali menjadi false setelah 2 detik (2000 milidetik)
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            doubleBackToExitPressedOnce = false;
+        }, 2000);
+    }
+    
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
