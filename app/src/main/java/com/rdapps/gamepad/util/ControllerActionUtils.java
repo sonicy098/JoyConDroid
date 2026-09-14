@@ -481,6 +481,7 @@ public class ControllerActionUtils {
         CONTROLLER_ACTIONS.add(new ControllerAction(RIGHT_STICK, Collections.singletonList(KEYCODE_BUTTON_THUMBR)));
         CONTROLLER_ACTIONS.add(new ControllerAction(RIGHT_JOYSTICK, AXIS_Z, 1, AXIS_RZ, -1));
         CONTROLLER_ACTIONS.add(new ControllerAction(LEFT_JOYSTICK, AXIS_X, 1, AXIS_Y, -1));
+        CONTROLLER_ACTIONS.add(new ControllerAction(JoystickType.FAKE_GYRO, 0, 0, 0, 0));
     }
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

@@ -2,5 +2,6 @@ package com.rdapps.gamepad.device;
 
 public enum JoystickType {
     RIGHT_JOYSTICK,
-    LEFT_JOYSTICK
+    LEFT_JOYSTICK,
+    FAKE_GYRO
 }

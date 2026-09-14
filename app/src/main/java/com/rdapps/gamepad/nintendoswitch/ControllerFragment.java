@@ -13,6 +13,8 @@ import static com.rdapps.gamepad.util.EventUtils.getCenteredAxis;
 import static com.rdapps.gamepad.util.EventUtils.getJoyStickEvent;
 import static com.rdapps.gamepad.util.EventUtils.getTouchDownEvent;
 import static com.rdapps.gamepad.util.EventUtils.getTouchUpEvent;
+import com.rdapps.gamepad.sensor.AccelerometerEvent;
+import com.rdapps.gamepad.sensor.GyroscopeEvent;
 
 import android.content.Context;
 import android.content.Intent;
@@ -311,6 +313,45 @@ public abstract class ControllerFragment extends Fragment {
         Map<JoystickType, ControllerAction> joystickMap = getJoystickMap();
         ControllerAction rightJoystickAction = joystickMap.get(JoystickType.RIGHT_JOYSTICK);
         ControllerAction leftJoystickAction = joystickMap.get(JoystickType.LEFT_JOYSTICK);
+
+        // --- MULAI KODE FAKE GYRO ---
+        ControllerAction fakeGyroMapping = joystickMap.get(JoystickType.FAKE_GYRO);
+        if (fakeGyroMapping != null && fakeGyroMapping.getAxisX() != 0) {
+            float inputX = motionEvent.getAxisValue(fakeGyroMapping.getAxisX());
+            float inputY = motionEvent.getAxisValue(fakeGyroMapping.getAxisY());
+
+            float deadzone = 0.15f;
+
+            if (Math.abs(inputX) > deadzone || Math.abs(inputY) > deadzone) {
+                // Stik didorong: Palsukan ayunan kencang
+                float simulatedGyroPitch = inputY * 25.0f;
+                float simulatedGyroYaw = inputX * 25.0f;
+                float simulatedAccelZ = Math.max(Math.abs(inputX), Math.abs(inputY)) * 40.0f;
+
+                GyroscopeEvent fakeGyro = new GyroscopeEvent();
+                fakeGyro.timestamp = System.nanoTime();
+                fakeGyro.values = new float[]{simulatedGyroPitch, simulatedGyroYaw, 0f};
+
+                AccelerometerEvent fakeAccel = new AccelerometerEvent();
+                fakeAccel.timestamp = System.nanoTime();
+                fakeAccel.values = new float[]{0f, 0f, simulatedAccelZ};
+
+                if (this.device != null) {
+                    this.device.onSensorChanged(fakeGyro);
+                    this.device.onSensorChanged(fakeAccel);
+                }
+            } else {
+                // Stik posisi tengah: Palsukan gravitasi diam
+                AccelerometerEvent fakeAccel = new AccelerometerEvent();
+                fakeAccel.timestamp = System.nanoTime();
+                fakeAccel.values = new float[]{0f, 0f, 9.8f};
+
+                if (this.device != null) {
+                    this.device.onSensorChanged(fakeAccel);
+                }
+            }
+        }
+        // --- AKHIR KODE FAKE GYRO ---
 
         float rightStickX = 0;
         float rightStickY = 0;
