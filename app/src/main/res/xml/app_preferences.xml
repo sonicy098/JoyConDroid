@@ -21,6 +21,20 @@
 	        android:defaultValue="1"
 	        app:min="1"
 	        android:max="10" />
+	        
+        <SwitchPreferenceCompat
+	        android:key="FAKE_GYRO_ENABLED"
+	        android:title="Enable Fake Gyro (Stick-to-Gyro)"
+	        android:summary="Gunakan stik analog untuk memalsukan ayunan kontroler"
+	        android:defaultValue="false" />
+	
+	    <SeekBarPreference
+	        android:key="FAKE_GYRO_MULTIPLIER"
+	        android:title="Fake Gyro Sensitivity Multiplier"
+	        android:summary="Tingkatkan jika ayunan stik tidak terdeteksi oleh game (Default: 1)"
+	        android:defaultValue="1"
+	        app:min="1"
+	        android:max="10" />
 
         <SwitchPreferenceCompat
             android:defaultValue="false"

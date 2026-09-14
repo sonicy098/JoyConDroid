@@ -315,39 +315,43 @@ public abstract class ControllerFragment extends Fragment {
         ControllerAction leftJoystickAction = joystickMap.get(JoystickType.LEFT_JOYSTICK);
 
         // --- MULAI KODE FAKE GYRO ---
-        ControllerAction fakeGyroMapping = joystickMap.get(JoystickType.FAKE_GYRO);
-        if (fakeGyroMapping != null && fakeGyroMapping.getAxisX() != 0) {
-            float inputX = motionEvent.getAxisValue(fakeGyroMapping.getAxisX());
-            float inputY = motionEvent.getAxisValue(fakeGyroMapping.getAxisY());
+        // 1. Cek apakah fitur diaktifkan di pengaturan
+        if (PreferenceUtils.getFakeGyroEnabled(getContext())) {
+            ControllerAction fakeGyroMapping = joystickMap.get(JoystickType.FAKE_GYRO);
+            if (fakeGyroMapping != null && fakeGyroMapping.getAxisX() != 0) {
+                float inputX = motionEvent.getAxisValue(fakeGyroMapping.getAxisX());
+                float inputY = motionEvent.getAxisValue(fakeGyroMapping.getAxisY());
 
-            float deadzone = 0.15f;
+                float deadzone = 0.15f;
+                // 2. Ambil nilai multiplier dari pengaturan
+                int multiplier = PreferenceUtils.getFakeGyroMultiplier(getContext());
 
-            if (Math.abs(inputX) > deadzone || Math.abs(inputY) > deadzone) {
-                // Stik didorong: Palsukan ayunan kencang
-                float simulatedGyroPitch = inputY * 25.0f;
-                float simulatedGyroYaw = inputX * 25.0f;
-                float simulatedAccelZ = Math.max(Math.abs(inputX), Math.abs(inputY)) * 40.0f;
+                if (Math.abs(inputX) > deadzone || Math.abs(inputY) > deadzone) {
+                    // 3. Kalikan nilai dorongan dengan multiplier
+                    float simulatedGyroPitch = inputY * 25.0f * multiplier;
+                    float simulatedGyroYaw = inputX * 25.0f * multiplier;
+                    float simulatedAccelZ = Math.max(Math.abs(inputX), Math.abs(inputY)) * 40.0f * multiplier;
 
-                GyroscopeEvent fakeGyro = new GyroscopeEvent();
-                fakeGyro.timestamp = System.nanoTime();
-                fakeGyro.values = new float[]{simulatedGyroPitch, simulatedGyroYaw, 0f};
+                    GyroscopeEvent fakeGyro = new GyroscopeEvent();
+                    fakeGyro.timestamp = System.nanoTime();
+                    fakeGyro.values = new float[]{simulatedGyroPitch, simulatedGyroYaw, 0f};
 
-                AccelerometerEvent fakeAccel = new AccelerometerEvent();
-                fakeAccel.timestamp = System.nanoTime();
-                fakeAccel.values = new float[]{0f, 0f, simulatedAccelZ};
+                    AccelerometerEvent fakeAccel = new AccelerometerEvent();
+                    fakeAccel.timestamp = System.nanoTime();
+                    fakeAccel.values = new float[]{0f, 0f, simulatedAccelZ};
 
-                if (this.device != null) {
-                    injectFakeSensor(fakeGyro, GyroscopeEvent.class);
-                	injectFakeSensor(fakeAccel, AccelerometerEvent.class);
-                }
-            } else {
-                // Stik posisi tengah: Palsukan gravitasi diam
-                AccelerometerEvent fakeAccel = new AccelerometerEvent();
-                fakeAccel.timestamp = System.nanoTime();
-                fakeAccel.values = new float[]{0f, 0f, 9.8f};
+                    if (this.device != null) {
+                        injectFakeSensor(fakeGyro, GyroscopeEvent.class);
+                        injectFakeSensor(fakeAccel, AccelerometerEvent.class);
+                    }
+                } else {
+                    AccelerometerEvent fakeAccel = new AccelerometerEvent();
+                    fakeAccel.timestamp = System.nanoTime();
+                    fakeAccel.values = new float[]{0f, 0f, 9.8f};
 
-                if (this.device != null) {
-                    injectFakeSensor(fakeAccel, AccelerometerEvent.class);
+                    if (this.device != null) {
+                        injectFakeSensor(fakeAccel, AccelerometerEvent.class);
+                    }
                 }
             }
         }

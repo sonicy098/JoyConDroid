@@ -37,6 +37,8 @@ public class PreferenceUtils {
     private static final String PACKET_RATE = "PACKET_RATE";
     
     private static final String SENSOR_MULTIPLIER = "SENSOR_MULTIPLIER";
+    private static final String FAKE_GYRO_ENABLED = "FAKE_GYRO_ENABLED";
+    private static final String FAKE_GYRO_MULTIPLIER = "FAKE_GYRO_MULTIPLIER";
 
     public static int getSensorMultiplier(Context context) {
         // Default adalah 1 (sensor murni tanpa amplifikasi)
@@ -44,6 +46,30 @@ public class PreferenceUtils {
                 .getInt(SENSOR_MULTIPLIER, 1);
     }
 
+    public static boolean getFakeGyroEnabled(Context context) {
+        return PreferenceManager.getDefaultSharedPreferences(context)
+                .getBoolean(FAKE_GYRO_ENABLED, false); // Default nonaktif
+    }
+
+    public static void setFakeGyroEnabled(Context context, boolean enabled) {
+        PreferenceManager.getDefaultSharedPreferences(context)
+                .edit()
+                .putBoolean(FAKE_GYRO_ENABLED, enabled)
+                .apply();
+    }
+
+    public static int getFakeGyroMultiplier(Context context) {
+        return PreferenceManager.getDefaultSharedPreferences(context)
+                .getInt(FAKE_GYRO_MULTIPLIER, 1); // Default multiplier 1
+    }
+
+    public static void setFakeGyroMultiplier(Context context, int multiplier) {
+        PreferenceManager.getDefaultSharedPreferences(context)
+                .edit()
+                .putInt(FAKE_GYRO_MULTIPLIER, multiplier)
+                .apply();
+    }
+    
     public static void saveOriginalName(Context context, String name) {
         Optional<String> originalName = getOriginalName(context);
         if (!originalName.isPresent()) {
