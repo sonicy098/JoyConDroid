@@ -108,6 +108,28 @@ public class ControllerActivity extends AppCompatActivity {
         }
 
         setContentView(R.layout.activity_left_joycon);
+        
+        // Variabel pelacak diletakkan di dalam array agar bisa diubah dari dalam inner class
+        final boolean[] doubleBackToExitPressedOnce = {false};
+
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (doubleBackToExitPressedOnce[0]) {
+                    // Jika sudah ditekan sekali, eksekusi aksi kembali bawaan OS
+                    setEnabled(false);
+                    getOnBackPressedDispatcher().onBackPressed();
+                    return;
+                }
+
+                doubleBackToExitPressedOnce[0] = true;
+                android.widget.Toast.makeText(ControllerActivity.this, "Tekan KEMBALI sekali lagi untuk keluar dari Gamepad", android.widget.Toast.LENGTH_SHORT).show();
+
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                    doubleBackToExitPressedOnce[0] = false;
+                }, 2000);
+            }
+        });
 
         Intent intent = getIntent();
         // Get Controller Type From Extras
@@ -166,24 +188,6 @@ public class ControllerActivity extends AppCompatActivity {
         bluetoothBroadcastReceiver =
                 new BluetoothBroadcastReceiver(new BluetoothBroadcastReceiverListener());
         registerReceiver(bluetoothBroadcastReceiver, intentFilter);
-    }
-
-    @Override
-    public void onBackPressed() {
-        // Jika tombol sudah ditekan sekali dalam 2 detik terakhir, izinkan keluar
-        if (doubleBackToExitPressedOnce) {
-            super.onBackPressed();
-            return;
-        }
-
-        // Jika baru ditekan sekali, tahan layar dan munculkan peringatan
-        this.doubleBackToExitPressedOnce = true;
-        Toast.makeText(this, "Tekan KEMBALI sekali lagi untuk keluar dari Gamepad", Toast.LENGTH_SHORT).show();
-
-        // Jalankan timer untuk mereset status kembali menjadi false setelah 2 detik (2000 milidetik)
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            doubleBackToExitPressedOnce = false;
-        }, 2000);
     }
     
     @Override

@@ -337,8 +337,8 @@ public abstract class ControllerFragment extends Fragment {
                 fakeAccel.values = new float[]{0f, 0f, simulatedAccelZ};
 
                 if (this.device != null) {
-                    this.device.onSensorChanged(fakeGyro);
-                    this.device.onSensorChanged(fakeAccel);
+                    injectFakeSensor(fakeGyro, GyroscopeEvent.class);
+                	injectFakeSensor(fakeAccel, AccelerometerEvent.class);
                 }
             } else {
                 // Stik posisi tengah: Palsukan gravitasi diam
@@ -347,7 +347,7 @@ public abstract class ControllerFragment extends Fragment {
                 fakeAccel.values = new float[]{0f, 0f, 9.8f};
 
                 if (this.device != null) {
-                    this.device.onSensorChanged(fakeAccel);
+                    injectFakeSensor(fakeAccel, AccelerometerEvent.class);
                 }
             }
         }
@@ -613,5 +613,31 @@ public abstract class ControllerFragment extends Fragment {
 
     public abstract void setPlayerLights(
             LedState led1, LedState led2, LedState led3, LedState led4);
+            
+    private void injectFakeSensor(Object eventObj, Class<?> eventClass) {
+        if (this.device == null) return;
+        try {
+            // 1. Coba suntikkan melalui metode setter bawaan (Lombok)
+            String methodName = "set" + eventClass.getSimpleName();
+            java.lang.reflect.Method method = this.device.getClass().getMethod(methodName, eventClass);
+            method.invoke(this.device, eventObj);
+        } catch (Exception e) {
+            // 2. Fallback: Paksa timpa langsung variabel field-nya jika setter tidak ditemukan
+            try {
+                String fieldName = eventClass.getSimpleName().substring(0, 1).toLowerCase() + eventClass.getSimpleName().substring(1);
+                Class<?> clazz = this.device.getClass();
+                while (clazz != null) {
+                    try {
+                        java.lang.reflect.Field field = clazz.getDeclaredField(fieldName);
+                        field.setAccessible(true);
+                        field.set(this.device, eventObj);
+                        return;
+                    } catch (NoSuchFieldException ex) {
+                        clazz = clazz.getSuperclass();
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+    }
 
 }
