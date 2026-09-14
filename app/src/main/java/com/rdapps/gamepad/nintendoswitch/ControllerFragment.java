@@ -313,9 +313,8 @@ public abstract class ControllerFragment extends Fragment {
         Map<JoystickType, ControllerAction> joystickMap = getJoystickMap();
         ControllerAction rightJoystickAction = joystickMap.get(JoystickType.RIGHT_JOYSTICK);
         ControllerAction leftJoystickAction = joystickMap.get(JoystickType.LEFT_JOYSTICK);
-
+        
         // --- MULAI KODE FAKE GYRO ---
-        // 1. Cek apakah fitur diaktifkan di pengaturan
         if (PreferenceUtils.getFakeGyroEnabled(getContext())) {
             ControllerAction fakeGyroMapping = joystickMap.get(JoystickType.FAKE_GYRO);
             if (fakeGyroMapping != null && fakeGyroMapping.getAxisX() != 0) {
@@ -323,35 +322,20 @@ public abstract class ControllerFragment extends Fragment {
                 float inputY = motionEvent.getAxisValue(fakeGyroMapping.getAxisY());
 
                 float deadzone = 0.15f;
-                // 2. Ambil nilai multiplier dari pengaturan
                 int multiplier = PreferenceUtils.getFakeGyroMultiplier(getContext());
 
                 if (Math.abs(inputX) > deadzone || Math.abs(inputY) > deadzone) {
-                    // 3. Kalikan nilai dorongan dengan multiplier
                     float simulatedGyroPitch = inputY * 25.0f * multiplier;
                     float simulatedGyroYaw = inputX * 25.0f * multiplier;
                     float simulatedAccelZ = Math.max(Math.abs(inputX), Math.abs(inputY)) * 40.0f * multiplier;
 
-                    GyroscopeEvent fakeGyro = new GyroscopeEvent();
-                    fakeGyro.timestamp = System.nanoTime();
-                    fakeGyro.values = new float[]{simulatedGyroPitch, simulatedGyroYaw, 0f};
-
-                    AccelerometerEvent fakeAccel = new AccelerometerEvent();
-                    fakeAccel.timestamp = System.nanoTime();
-                    fakeAccel.values = new float[]{0f, 0f, simulatedAccelZ};
-
-                    if (this.device != null) {
-                        injectFakeSensor(fakeGyro, GyroscopeEvent.class);
-                        injectFakeSensor(fakeAccel, AccelerometerEvent.class);
-                    }
+                    // Kirim lonjakan G-Force pendorong Pokéball
+                    sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{simulatedGyroPitch, simulatedGyroYaw, 0f});
+                    sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, simulatedAccelZ});
                 } else {
-                    AccelerometerEvent fakeAccel = new AccelerometerEvent();
-                    fakeAccel.timestamp = System.nanoTime();
-                    fakeAccel.values = new float[]{0f, 0f, 9.8f};
-
-                    if (this.device != null) {
-                        injectFakeSensor(fakeAccel, AccelerometerEvent.class);
-                    }
+                    // Stik posisi tengah: Kembalikan kondisi gravitasi diam agar ayunan terputus
+                    sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{0f, 0f, 0f});
+                    sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, 9.8f});
                 }
             }
         }
@@ -618,29 +602,36 @@ public abstract class ControllerFragment extends Fragment {
     public abstract void setPlayerLights(
             LedState led1, LedState led2, LedState led3, LedState led4);
             
-    private void injectFakeSensor(Object eventObj, Class<?> eventClass) {
+    private void sendFakeSensorEvent(int sensorType, float[] values) {
         if (this.device == null) return;
         try {
-            // 1. Coba suntikkan melalui metode setter bawaan (Lombok)
-            String methodName = "set" + eventClass.getSimpleName();
-            java.lang.reflect.Method method = this.device.getClass().getMethod(methodName, eventClass);
-            method.invoke(this.device, eventObj);
+            // 1. Buat instansiasi objek SensorEvent milik OS Android (konstruktor butuh ukuran array 3)
+            java.lang.reflect.Constructor<android.hardware.SensorEvent> constructor = 
+                    android.hardware.SensorEvent.class.getDeclaredConstructor(Integer.TYPE);
+            constructor.setAccessible(true);
+            android.hardware.SensorEvent event = constructor.newInstance(3);
+
+            // 2. Curi referensi perangkat keras sensor untuk mengelabui validasi JoyController
+            SensorManager sm = getSensorManager();
+            android.hardware.Sensor sensor = sm.getDefaultSensor(sensorType);
+            if (sensor == null && sensorType == android.hardware.Sensor.TYPE_GYROSCOPE) {
+                sensor = sm.getDefaultSensor(android.hardware.Sensor.TYPE_GYROSCOPE_UNCALIBRATED);
+            }
+
+            // 3. Suntikkan referensi sensor dan kalkulasi matriks ke dalam event
+            java.lang.reflect.Field sensorField = android.hardware.SensorEvent.class.getDeclaredField("sensor");
+            sensorField.setAccessible(true);
+            sensorField.set(event, sensor);
+
+            event.timestamp = System.nanoTime();
+            event.values[0] = values[0];
+            event.values[1] = values[1];
+            event.values[2] = values[2];
+
+            // 4. Paksa JoyController mengeksekusi event ini agar datanya dikirim via Bluetooth
+            ((android.hardware.SensorEventListener) this.device).onSensorChanged(event);
         } catch (Exception e) {
-            // 2. Fallback: Paksa timpa langsung variabel field-nya jika setter tidak ditemukan
-            try {
-                String fieldName = eventClass.getSimpleName().substring(0, 1).toLowerCase() + eventClass.getSimpleName().substring(1);
-                Class<?> clazz = this.device.getClass();
-                while (clazz != null) {
-                    try {
-                        java.lang.reflect.Field field = clazz.getDeclaredField(fieldName);
-                        field.setAccessible(true);
-                        field.set(this.device, eventObj);
-                        return;
-                    } catch (NoSuchFieldException ex) {
-                        clazz = clazz.getSuperclass();
-                    }
-                }
-            } catch (Exception ignored) {}
+            android.util.Log.e("FAKE_GYRO", "Gagal memalsukan sensor OS", e);
         }
     }
 
