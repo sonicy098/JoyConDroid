@@ -325,14 +325,22 @@ public abstract class ControllerFragment extends Fragment {
                 int multiplier = PreferenceUtils.getFakeGyroMultiplier(getContext());
 
                 if (Math.abs(inputX) > deadzone || Math.abs(inputY) > deadzone) {
-                    float simulatedGyroPitch = inputY * 25.0f * multiplier;
-                    float simulatedGyroYaw = inputX * 25.0f * multiplier;
-                    float simulatedAccelZ = Math.max(Math.abs(inputX), Math.abs(inputY)) * 40.0f * multiplier;
-
-                    // Kirim lonjakan G-Force pendorong Pokéball
-                    sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{simulatedGyroPitch, simulatedGyroYaw, 0f});
-                    sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, simulatedAccelZ});
-                } else {
+			        // Rotasi Pitch (Sumbu X) untuk ayunan lurus, Yaw (Sumbu Y) untuk menyamping
+			        float simulatedGyroPitch = inputY * 35.0f * multiplier;
+			        float simulatedGyroYaw = inputX * 35.0f * multiplier;
+			        // Tambahkan efek Roll (Sumbu Z) buatan agar data gerakan tidak terlihat kaku/robotik
+			        float simulatedGyroRoll = (inputX + inputY) * 15.0f * multiplier;
+			
+			        // Pindahkan beban G-Force lemparan ke Sumbu Y
+			        float simulatedAccelY = inputY * 50.0f * multiplier; 
+			        float simulatedAccelZ = inputX * 30.0f * multiplier; 
+			
+			        sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, 
+			            new float[]{simulatedGyroPitch, simulatedGyroYaw, simulatedGyroRoll});
+			        
+			        sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, 
+			            new float[]{0f, simulatedAccelY, simulatedAccelZ});
+			    } else {
                     // Stik posisi tengah: Kembalikan kondisi gravitasi diam agar ayunan terputus
                     sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{0f, 0f, 0f});
                     sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, 9.8f});
@@ -372,7 +380,7 @@ public abstract class ControllerFragment extends Fragment {
                     radius, centerX, centerY);
             leftJoyStick.dispatchTouchEvent(joyStickEvent);
         }
-
+        
         JoyStick rightJoyStick = getRightJoyStick();
         if (rightJoyStick != null) {
             float radius = rightJoyStick.getRadius();
