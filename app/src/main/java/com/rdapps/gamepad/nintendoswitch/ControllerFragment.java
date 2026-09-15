@@ -321,25 +321,33 @@ public abstract class ControllerFragment extends Fragment {
                 float inputX = motionEvent.getAxisValue(fakeGyroMapping.getAxisX());
                 float inputY = motionEvent.getAxisValue(fakeGyroMapping.getAxisY());
 
-                // Ambang batas 80% agar tidak mudah melempar tanpa disengaja
-                float triggerDeadzone = 0.8f; 
-                int multiplier = PreferenceUtils.getFakeGyroMultiplier(getContext());
+                // Ambang batas diperbesar agar tidak tidak sengaja kesentuh
+                float deadzone = 0.5f; 
 
-                if (Math.abs(inputX) > triggerDeadzone || Math.abs(inputY) > triggerDeadzone) {
-                    // Eksekusi rentetan gerakan otomatis
-                    executeThrowMacro(inputX, inputY, multiplier);
-                } else if (Math.abs(inputX) < 0.2f && Math.abs(inputY) < 0.2f) {
-                    if (!isThrowing) {
-                        // Stik di posisi tengah: Gravitasi normal
-                        sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{0f, 0f, 0f});
-                        sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, 9.8f});
-                    }
+                if (Math.abs(inputX) > deadzone || Math.abs(inputY) > deadzone) {
+                    // Tiru fenomena "Multiplier 3" (Overpowered/Shake behavior)
+                    // Math.signum akan mengubah nilai input menjadi +1, -1, atau 0 murni berdasarkan arah
+                    float spikeGyroPitch = Math.signum(inputY) * 35.0f; 
+                    float spikeGyroYaw   = Math.signum(inputX) * 35.0f;
+                    
+                    float spikeAccelY = Math.signum(inputY) * 45.0f;
+                    // Beri dorongan Z yang besar agar game mengira ada lemparan lurus ke depan
+                    float spikeAccelZ = 45.0f; 
+
+                    sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, 
+                            new float[]{spikeGyroPitch, spikeGyroYaw, 0f});
+                    sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, 
+                            new float[]{0f, spikeAccelY, spikeAccelZ});
+                } else {
+                    // Stik dilepas: Hentikan guncangan dengan instan
+                    sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{0f, 0f, 0f});
+                    sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, 9.8f});
                 }
             }
         }
         // --- AKHIR KODE FAKE GYRO ---
 
-
+        
         float rightStickX = 0;
         float rightStickY = 0;
         if (rightJoystickAction != null) {
