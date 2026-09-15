@@ -324,38 +324,31 @@ public abstract class ControllerFragment extends Fragment {
                 float inputX = motionEvent.getAxisValue(fakeGyroMapping.getAxisX());
                 float inputY = motionEvent.getAxisValue(fakeGyroMapping.getAxisY());
 
-                // 1. Kalkulasi Kecepatan Pergerakan Stik (Velocity)
+                // Kalkulasi Delta (Kecepatan stik)
                 float deltaX = inputX - prevFakeGyroX;
                 float deltaY = inputY - prevFakeGyroY;
                 
-                // Simpan posisi saat ini untuk kalkulasi frame berikutnya
                 prevFakeGyroX = inputX;
                 prevFakeGyroY = inputY;
 
                 int multiplier = PreferenceUtils.getFakeGyroMultiplier(getContext());
-                float deadzone = 0.1f;
+                float deadzone = 0.15f;
 
                 if (Math.abs(inputX) > deadzone || Math.abs(inputY) > deadzone) {
-                    // 2. Gyroscope = Mengukur seberapa cepat stik digerakkan (Delta)
-                    float simulatedGyroPitch = deltaY * 40.0f * multiplier; 
-                    float simulatedGyroYaw = deltaX * 40.0f * multiplier;
+                    // TANPA CLAMPING: Biarkan angkanya meledak hingga ratusan jika perlu!
+                    // Menggabungkan kekuatan Posisi (input) dan Kecepatan Sentakan (delta)
+                    float simulatedGyroPitch = (inputY * 25.0f * multiplier) + (deltaY * 50.0f * multiplier); 
+                    float simulatedGyroYaw = (inputX * 25.0f * multiplier) + (deltaX * 50.0f * multiplier);
                     
-                    // 3. Accelerometer = Gabungan sudut kemiringan statis (inputY) dan gaya sentakan dorong (deltaY)
-                    float simulatedAccelY = (inputY * 15.0f) + (deltaY * 30.0f * multiplier);
-                    float simulatedAccelZ = 9.8f + (deltaY * 20.0f * multiplier); // Gaya dorong ke depan + Gravitasi
-
-                    // 4. Clamping: Jaga agar kalkulasi turunan ini tidak merusak batas fisika Switch (maks 30 rad/s)
-                    simulatedGyroPitch = Math.max(-30f, Math.min(30f, simulatedGyroPitch));
-                    simulatedGyroYaw = Math.max(-30f, Math.min(30f, simulatedGyroYaw));
-                    simulatedAccelY = Math.max(-40f, Math.min(40f, simulatedAccelY));
-                    simulatedAccelZ = Math.max(-40f, Math.min(40f, simulatedAccelZ));
+                    float simulatedAccelY = (inputY * 30.0f * multiplier) + (deltaY * 60.0f * multiplier);
+                    float simulatedAccelZ = 9.8f + (Math.abs(inputY) * 40.0f * multiplier);
 
                     sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, 
                             new float[]{simulatedGyroPitch, simulatedGyroYaw, 0f});
                     sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, 
                             new float[]{0f, simulatedAccelY, simulatedAccelZ});
                 } else {
-                    // Saat stik kembali ke tengah, kembalikan ke kondisi diam sempurna
+                    // Stik posisi netral
                     sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{0f, 0f, 0f});
                     sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, 9.8f});
                 }
@@ -363,7 +356,6 @@ public abstract class ControllerFragment extends Fragment {
         }
         // --- AKHIR KODE FAKE GYRO ---
 
-        
         float rightStickX = 0;
         float rightStickY = 0;
         if (rightJoystickAction != null) {
