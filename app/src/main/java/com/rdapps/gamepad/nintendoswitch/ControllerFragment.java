@@ -321,32 +321,34 @@ public abstract class ControllerFragment extends Fragment {
                 float inputX = motionEvent.getAxisValue(fakeGyroMapping.getAxisX());
                 float inputY = motionEvent.getAxisValue(fakeGyroMapping.getAxisY());
 
-                // Ambang batas diperbesar agar tidak tidak sengaja kesentuh
                 float deadzone = 0.5f; 
 
                 if (Math.abs(inputX) > deadzone || Math.abs(inputY) > deadzone) {
-                    // Tiru fenomena "Multiplier 3" (Overpowered/Shake behavior)
-                    // Math.signum akan mengubah nilai input menjadi +1, -1, atau 0 murni berdasarkan arah
-                    float spikeGyroPitch = Math.signum(inputY) * 35.0f; 
-                    float spikeGyroYaw   = Math.signum(inputX) * 35.0f;
+                    // 1. Buat "Noise" acak (fluktuasi antara -15.0 hingga +15.0)
+                    // Karena packet rate Anda 120Hz, angka ini akan berubah-ubah 120 kali per detik!
+                    float noiseGyro = (float) (Math.random() * 30.0 - 15.0);
+                    float noiseAccel = (float) (Math.random() * 30.0 - 15.0);
+
+                    // 2. Gabungkan arah stik dengan noise acak tersebut
+                    float spikeGyroPitch = (Math.signum(inputY) * 25.0f) + noiseGyro; 
+                    float spikeGyroYaw   = (Math.signum(inputX) * 25.0f) + noiseGyro;
+                    float spikeGyroRoll  = noiseGyro; // Biarkan sumbu Z bergetar acak
                     
-                    float spikeAccelY = Math.signum(inputY) * 45.0f;
-                    // Beri dorongan Z yang besar agar game mengira ada lemparan lurus ke depan
-                    float spikeAccelZ = 45.0f; 
+                    float spikeAccelY = (Math.signum(inputY) * 30.0f) + noiseAccel;
+                    float spikeAccelZ = 30.0f + noiseAccel; // Dorongan lurus ke depan yang bergetar
 
                     sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, 
-                            new float[]{spikeGyroPitch, spikeGyroYaw, 0f});
+                            new float[]{spikeGyroPitch, spikeGyroYaw, spikeGyroRoll});
                     sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, 
-                            new float[]{0f, spikeAccelY, spikeAccelZ});
+                            new float[]{noiseAccel, spikeAccelY, spikeAccelZ});
                 } else {
-                    // Stik dilepas: Hentikan guncangan dengan instan
+                    // Stik dilepas: Hentikan getaran seketika
                     sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{0f, 0f, 0f});
                     sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, 9.8f});
                 }
             }
         }
         // --- AKHIR KODE FAKE GYRO ---
-
         
         float rightStickX = 0;
         float rightStickY = 0;
