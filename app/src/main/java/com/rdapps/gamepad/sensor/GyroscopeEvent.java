@@ -21,6 +21,11 @@ public class GyroscopeEvent {
                 event.values[1] * multiplier,
                 event.values[2] * multiplier
         };
+                // Rekam pergerakan gyro, tapi filter angka kecil (noise) agar Logcat tidak lag
+        if (Math.abs(e.values[0]) > 2.0f || Math.abs(e.values[1]) > 2.0f || Math.abs(e.values[2]) > 2.0f) {
+            android.util.Log.d("SENSOR_REKAM_GYRO", "Pitch(X): " + e.values[0] + " | Yaw(Y): " + e.values[1] + " | Roll(Z): " + e.values[2]);
+        }
+
         return e;
     }
 

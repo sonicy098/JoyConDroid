@@ -22,6 +22,11 @@ public class AccelerometerEvent {
                 event.values[1] * multiplier,
                 event.values[2] * multiplier
         };
+                // Rekam lonjakan G-Force, abaikan gravitasi diam (~9.8)
+        if (Math.abs(e.values[0]) > 3.0f || Math.abs(e.values[1]) > 3.0f || Math.abs(e.values[2] - 9.8f) > 3.0f) {
+            android.util.Log.d("SENSOR_REKAM_ACCEL", "X: " + e.values[0] + " | Y: " + e.values[1] + " | Z: " + e.values[2]);
+        }
+
         return e;
     }
 
