@@ -68,7 +68,10 @@ public abstract class ControllerFragment extends Fragment {
 
     protected Boolean hapticFeedBackEnabled;
     protected Vibrator vibrator;
-
+    
+	    // Variabel untuk menyimpan posisi stik Fake Gyro pada milidetik sebelumnya
+    private float prevFakeGyroX = 0f;
+    private float prevFakeGyroY = 0f;
 
     private float prevRightX = 0;
     private float prevRightY = 0;
@@ -321,34 +324,45 @@ public abstract class ControllerFragment extends Fragment {
                 float inputX = motionEvent.getAxisValue(fakeGyroMapping.getAxisX());
                 float inputY = motionEvent.getAxisValue(fakeGyroMapping.getAxisY());
 
-                float deadzone = 0.5f; 
+                // 1. Kalkulasi Kecepatan Pergerakan Stik (Velocity)
+                float deltaX = inputX - prevFakeGyroX;
+                float deltaY = inputY - prevFakeGyroY;
+                
+                // Simpan posisi saat ini untuk kalkulasi frame berikutnya
+                prevFakeGyroX = inputX;
+                prevFakeGyroY = inputY;
+
+                int multiplier = PreferenceUtils.getFakeGyroMultiplier(getContext());
+                float deadzone = 0.1f;
 
                 if (Math.abs(inputX) > deadzone || Math.abs(inputY) > deadzone) {
-                    // 1. Buat "Noise" acak (fluktuasi antara -15.0 hingga +15.0)
-                    // Karena packet rate Anda 120Hz, angka ini akan berubah-ubah 120 kali per detik!
-                    float noiseGyro = (float) (Math.random() * 30.0 - 15.0);
-                    float noiseAccel = (float) (Math.random() * 30.0 - 15.0);
-
-                    // 2. Gabungkan arah stik dengan noise acak tersebut
-                    float spikeGyroPitch = (Math.signum(inputY) * 25.0f) + noiseGyro; 
-                    float spikeGyroYaw   = (Math.signum(inputX) * 25.0f) + noiseGyro;
-                    float spikeGyroRoll  = noiseGyro; // Biarkan sumbu Z bergetar acak
+                    // 2. Gyroscope = Mengukur seberapa cepat stik digerakkan (Delta)
+                    float simulatedGyroPitch = deltaY * 40.0f * multiplier; 
+                    float simulatedGyroYaw = deltaX * 40.0f * multiplier;
                     
-                    float spikeAccelY = (Math.signum(inputY) * 30.0f) + noiseAccel;
-                    float spikeAccelZ = 30.0f + noiseAccel; // Dorongan lurus ke depan yang bergetar
+                    // 3. Accelerometer = Gabungan sudut kemiringan statis (inputY) dan gaya sentakan dorong (deltaY)
+                    float simulatedAccelY = (inputY * 15.0f) + (deltaY * 30.0f * multiplier);
+                    float simulatedAccelZ = 9.8f + (deltaY * 20.0f * multiplier); // Gaya dorong ke depan + Gravitasi
+
+                    // 4. Clamping: Jaga agar kalkulasi turunan ini tidak merusak batas fisika Switch (maks 30 rad/s)
+                    simulatedGyroPitch = Math.max(-30f, Math.min(30f, simulatedGyroPitch));
+                    simulatedGyroYaw = Math.max(-30f, Math.min(30f, simulatedGyroYaw));
+                    simulatedAccelY = Math.max(-40f, Math.min(40f, simulatedAccelY));
+                    simulatedAccelZ = Math.max(-40f, Math.min(40f, simulatedAccelZ));
 
                     sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, 
-                            new float[]{spikeGyroPitch, spikeGyroYaw, spikeGyroRoll});
+                            new float[]{simulatedGyroPitch, simulatedGyroYaw, 0f});
                     sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, 
-                            new float[]{noiseAccel, spikeAccelY, spikeAccelZ});
+                            new float[]{0f, simulatedAccelY, simulatedAccelZ});
                 } else {
-                    // Stik dilepas: Hentikan getaran seketika
+                    // Saat stik kembali ke tengah, kembalikan ke kondisi diam sempurna
                     sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{0f, 0f, 0f});
                     sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, 9.8f});
                 }
             }
         }
         // --- AKHIR KODE FAKE GYRO ---
+
         
         float rightStickX = 0;
         float rightStickY = 0;
