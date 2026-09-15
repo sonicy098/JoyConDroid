@@ -319,38 +319,26 @@ public abstract class ControllerFragment extends Fragment {
         
         // --- MULAI KODE FAKE GYRO ---
         if (PreferenceUtils.getFakeGyroEnabled(getContext())) {
-            ControllerAction fakeGyroMapping = joystickMap.get(JoystickType.FAKE_GYRO);
-            if (fakeGyroMapping != null && fakeGyroMapping.getAxisX() != 0) {
-                float inputX = motionEvent.getAxisValue(fakeGyroMapping.getAxisX());
-                float inputY = motionEvent.getAxisValue(fakeGyroMapping.getAxisY());
+            
+            // KUNCI UTAMA: Jika bola sedang dilempar, abaikan input stik sepenuhnya!
+            if (!isThrowingMacro) {
+                ControllerAction fakeGyroMapping = joystickMap.get(JoystickType.FAKE_GYRO);
+                if (fakeGyroMapping != null && fakeGyroMapping.getAxisX() != 0) {
+                    float inputX = motionEvent.getAxisValue(fakeGyroMapping.getAxisX());
+                    float inputY = motionEvent.getAxisValue(fakeGyroMapping.getAxisY());
 
-                // Kalkulasi Delta (Kecepatan stik)
-                float deltaX = inputX - prevFakeGyroX;
-                float deltaY = inputY - prevFakeGyroY;
-                
-                prevFakeGyroX = inputX;
-                prevFakeGyroY = inputY;
+                    float deadzone = 0.5f; 
+                    int multiplier = PreferenceUtils.getFakeGyroMultiplier(getContext());
 
-                int multiplier = PreferenceUtils.getFakeGyroMultiplier(getContext());
-                float deadzone = 0.15f;
-
-                if (Math.abs(inputX) > deadzone || Math.abs(inputY) > deadzone) {
-                    // TANPA CLAMPING: Biarkan angkanya meledak hingga ratusan jika perlu!
-                    // Menggabungkan kekuatan Posisi (input) dan Kecepatan Sentakan (delta)
-                    float simulatedGyroPitch = (inputY * 25.0f * multiplier) + (deltaY * 50.0f * multiplier); 
-                    float simulatedGyroYaw = (inputX * 25.0f * multiplier) + (deltaX * 50.0f * multiplier);
-                    
-                    float simulatedAccelY = (inputY * 30.0f * multiplier) + (deltaY * 60.0f * multiplier);
-                    float simulatedAccelZ = 9.8f + (Math.abs(inputY) * 40.0f * multiplier);
-
-                    sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, 
-                            new float[]{simulatedGyroPitch, simulatedGyroYaw, 0f});
-                    sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, 
-                            new float[]{0f, simulatedAccelY, simulatedAccelZ});
-                } else {
-                    // Stik posisi netral
-                    sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{0f, 0f, 0f});
-                    sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, 9.8f});
+                    // Cukup sentak stik ke arah mana saja melebihi 50%
+                    if (Math.abs(inputX) > deadzone || Math.abs(inputY) > deadzone) {
+                        // Picu rentetan rekaman gerakan otomatis
+                        executePerfectThrow(multiplier);
+                    } else {
+                        // Stik diam, aman untuk mengirim data netral
+                        sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{0f, 0f, 0f});
+                        sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, 9.8f});
+                    }
                 }
             }
         }
@@ -617,44 +605,43 @@ public abstract class ControllerFragment extends Fragment {
     public abstract void setPlayerLights(
             LedState led1, LedState led2, LedState led3, LedState led4);
             
-    // Variabel untuk mencegah makro terpicu berulang kali saat stik ditahan
-    private boolean isThrowing = false;
+    // Variabel gembok agar pergerakan stik diabaikan saat animasi lemparan sedang berjalan
+    private boolean isThrowingMacro = false;
 
-    private void executeThrowMacro(float dirX, float dirY, int multiplier) {
-        if (isThrowing) return;
-        isThrowing = true;
-        
+    private void executePerfectThrow(int multiplier) {
+        isThrowingMacro = true;
         android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
         
-        // Konversi arah stik ke kekuatan ayunan
-        final float baseAccelY = dirY * 60f * multiplier;
-        final float baseGyroPitch = dirY * 40f * multiplier;
-        final float baseAccelX = dirX * 60f * multiplier;
-        final float baseGyroYaw = dirX * 40f * multiplier;
+        // Batasi batas aman agar tidak terjadi Integer Overflow di protokol Bluetooth
+        float safeForce = Math.min(30f, 15f * multiplier); 
 
-        // Frame 1 (0ms): Tarikan awal ke belakang
+        // Meniru persis gerakan tangan "Bawah -> Kanan -> Atas" yang Anda temukan
+
+        // Frame 1 (0ms): Bawah (Wind-up / Tarikan pergelangan tangan ke belakang)
         handler.postDelayed(() -> {
-            sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{-baseGyroPitch * 0.3f, -baseGyroYaw * 0.3f, 0f});
-            sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{-baseAccelX * 0.3f, -baseAccelY * 0.3f, 9.8f});
+            sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{-safeForce, 0f, 0f});
+            sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, safeForce});
         }, 0);
 
-        // Frame 2 (40ms): Puncak ayunan cepat ke depan
+        // Frame 2 (40ms): Kanan (Rotasi / Curveball transisi)
         handler.postDelayed(() -> {
-            sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{baseGyroPitch, baseGyroYaw, 10f});
-            sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{baseAccelX, baseAccelY, 30f});
+            sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{0f, safeForce, 0f});
+            sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, safeForce});
         }, 40);
 
-        // Frame 3 (80ms): Deselerasi / Sentakan berhenti mendadak (Rahasia lemparan)
+        // Frame 3 (80ms): Atas (Sentakan pelontaran ke depan)
         handler.postDelayed(() -> {
-            sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{-baseGyroPitch * 0.5f, -baseGyroYaw * 0.5f, -10f});
-            sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{-baseAccelX * 0.5f, -baseAccelY * 0.5f, -10f});
+            sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{safeForce + 10f, 0f, 0f});
+            sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, safeForce + 10f});
         }, 80);
 
-        // Frame 4 (150ms): Stabilisasi / Kembali diam
+        // Frame 4 (150ms): Tangan berhenti mendadak (Memicu pelepasan Pokéball)
         handler.postDelayed(() -> {
             sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{0f, 0f, 0f});
             sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, 9.8f});
-            isThrowing = false; // Reset status agar bisa melempar lagi
+            
+            // Buka gembok agar Anda bisa melempar lagi
+            isThrowingMacro = false; 
         }, 150);
     }
             
