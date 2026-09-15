@@ -612,39 +612,44 @@ public abstract class ControllerFragment extends Fragment {
         isThrowingMacro = true;
         android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
         
-        // Batasi batas aman agar tidak terjadi Integer Overflow di protokol Bluetooth
-        float safeForce = Math.min(30f, 15f * multiplier); 
+        // Data keyframe diekstrak dari sensor_log.txt (X, Y, Z)
+        final float[][] accelData = {
+            {3.36f, 11.93f, -13.54f}, {4.28f, 12.81f, -10.53f}, {7.12f, 5.14f, -11.47f},
+            {9.13f, 0.32f, -16.58f}, {12.56f, -11.13f, -19.19f}, {14.28f, -26.07f, -26.54f},
+            {14.59f, -32.02f, -32.19f}, {6.29f, -37.43f, -37.37f}, {-6.41f, -38.23f, -29.97f},
+            {-17.18f, -39.03f, 12.08f}, {-17.81f, -39.42f, 30.87f}, {10.49f, -26.47f, 35.98f},
+            {23.78f, -10.36f, 36.92f}, {25.81f, -8.00f, 37.34f}, {25.87f, -7.68f, 37.04f}
+        };
+        
+        final float[][] gyroData = {
+            {-2.03f, 1.04f, 0.73f}, {-2.28f, 1.27f, 0.81f}, {-0.79f, 2.41f, 0.60f},
+            {3.86f, 4.07f, 0.31f}, {12.02f, 4.91f, -0.34f}, {16.97f, 3.69f, -0.22f},
+            {18.12f, 1.96f, 0.01f}, {15.88f, -1.44f, 1.15f}, {12.11f, -3.76f, 2.29f},
+            {8.28f, -4.38f, 4.69f}, {10.96f, 2.99f, 9.96f}, {18.74f, 7.67f, 9.81f},
+            {19.00f, -1.13f, 8.45f}, {16.21f, -17.98f, 10.20f}, {14.85f, -22.58f, 11.49f}
+        };
 
-        // Meniru persis gerakan tangan "Bawah -> Kanan -> Atas" yang Anda temukan
-
-        // Frame 1 (0ms): Bawah (Wind-up / Tarikan pergelangan tangan ke belakang)
-        handler.postDelayed(() -> {
-            sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{-safeForce, 0f, 0f});
-            sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, safeForce});
-        }, 0);
-
-        // Frame 2 (40ms): Kanan (Rotasi / Curveball transisi)
-        handler.postDelayed(() -> {
-            sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{0f, safeForce, 0f});
-            sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, safeForce});
-        }, 40);
-
-        // Frame 3 (80ms): Atas (Sentakan pelontaran ke depan)
-        handler.postDelayed(() -> {
-            sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{safeForce + 10f, 0f, 0f});
-            sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, safeForce + 10f});
-        }, 80);
-
-        // Frame 4 (150ms): Tangan berhenti mendadak (Memicu pelepasan Pokéball)
-        handler.postDelayed(() -> {
-            sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{0f, 0f, 0f});
-            sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, 9.8f});
-            
-            // Buka gembok agar Anda bisa melempar lagi
-            isThrowingMacro = false; 
-        }, 150);
+        // Mengatur jeda per frame (15ms) untuk mencegah penumpukan (buffer overflow) Bluetooth
+        int frameDelay = 15; 
+        
+        for (int i = 0; i < accelData.length; i++) {
+            final int index = i;
+            handler.postDelayed(() -> {
+                sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, gyroData[index]);
+                sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, accelData[index]);
+                
+                // Kembalikan ke posisi netral setelah frame terakhir selesai
+                if (index == accelData.length - 1) {
+                    handler.postDelayed(() -> {
+                        sendFakeSensorEvent(android.hardware.Sensor.TYPE_GYROSCOPE, new float[]{0f, 0f, 0f});
+                        sendFakeSensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER, new float[]{0f, 0f, 9.8f});
+                        isThrowingMacro = false; // Buka gembok makro
+                    }, 50);
+                }
+            }, (long) i * frameDelay);
+        }
     }
-            
+    
     private void sendFakeSensorEvent(int sensorType, float[] values) {
         if (this.device == null) return;
         try {
