@@ -21,6 +21,21 @@
 	        android:defaultValue="1"
 	        app:min="1"
 	        android:max="10" />
+	        
+     	<SwitchPreferenceCompat
+		    android:key="route_vibration_to_gamepad"
+		    android:title="Teruskan Getaran ke Gamepad USB/OTG"
+		    android:summary="Matikan getaran HP dan teruskan sinyal rumble ke stik eksternal"
+		    android:defaultValue="false" />
+		
+		<SeekBarPreference
+		    android:key="vibration_multiplier"
+		    android:title="Pengali Kekuatan Getaran (Multiplier)"
+		    android:summary="Tingkatkan kekuatan getaran pada Gamepad"
+		    android:defaultValue="10"
+		    android:max="30" 
+		    app:min="5" /> 
+		<!-- Catatan: Nilai 10 berarti 1.0x, 15 berarti 1.5x, dst. -->
 
         <SwitchPreferenceCompat
             android:defaultValue="false"

@@ -31,6 +31,7 @@ import com.rdapps.gamepad.util.ByteUtils;
 import com.rdapps.gamepad.util.ThreadUtil;
 import com.rdapps.gamepad.util.PreferenceUtils;
 import com.rdapps.gamepad.vibrator.RumbleData;
+import com.rdapps.gamepad.vibrator.GamepadVibrationHelper;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -261,8 +262,14 @@ public class JoyController extends AbstractDevice {
         if (!state.isVibrationEnabled() || listener == null) {
             return;
         }
-        listener.rumble(rumbleData.getAndroidAmplitude());
+        
+        // Nonaktifkan eksekusi getar bawaan HP
+        // listener.rumble(rumbleData.getAndroidAmplitude());
+        
+        // Alihkan eksekusinya ke Helper buatan kita
+        GamepadVibrationHelper.triggerRumble(context, rumbleData.getAndroidAmplitude());
     }
+
 
     @Override
     public void onGetReport(BluetoothDevice device, byte type, byte id, int bufferSize) {
