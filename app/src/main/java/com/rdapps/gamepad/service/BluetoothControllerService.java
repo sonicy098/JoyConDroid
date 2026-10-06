@@ -38,6 +38,7 @@ import android.os.Binder;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.PowerManager;
 import com.rdapps.gamepad.ControllerActivity;
 import com.rdapps.gamepad.R;
 import com.rdapps.gamepad.led.LedState;
@@ -71,6 +72,7 @@ public class BluetoothControllerService extends Service implements BluetoothProf
 
     private static final String INTENT_DISCONNECT = "INTENT_DISCONNECT";
 
+    private PowerManager.WakeLock wakeLock;
 
     private static final int NOTIFICATION_ID = 1332;
     private static final String TAG = "BluetoothControllerService";
@@ -228,6 +230,12 @@ public class BluetoothControllerService extends Service implements BluetoothProf
     public void onCreate() {
         log(TAG, "onCreate");
 
+        PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+	    if (powerManager != null) {
+	        // PARTIAL_WAKE_LOCK memastikan CPU tetap berjalan meski layar mati
+	        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "JoyConDroid::BluetoothKeepAlive");
+	        wakeLock.acquire();
+	    }
         appRegistered = false;
         serviceConnected = false;
         deviceConnected = false;
@@ -499,6 +507,10 @@ public class BluetoothControllerService extends Service implements BluetoothProf
     @Override
     public void onDestroy() {
         state = State.DESTROYING;
+        
+        if (wakeLock != null && wakeLock.isHeld()) {
+	        wakeLock.release();
+	    }
 
         if (Objects.nonNull(batteryReceiver)) {
             unregisterReceiver(batteryReceiver);
