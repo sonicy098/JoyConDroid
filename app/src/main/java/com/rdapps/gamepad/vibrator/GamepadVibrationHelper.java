@@ -13,7 +13,8 @@ public class GamepadVibrationHelper {
 
     private static Vibrator motor1 = null;
     private static Vibrator motor2 = null;
-    private static boolean isInitialized = false;
+    private static Thread testThread = null;
+    private static volatile boolean isTesting = false;
 
     public static void triggerStereoRumble(Context context, int leftAmplitude, int rightAmplitude) {
         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
@@ -68,29 +69,63 @@ public class GamepadVibrationHelper {
         }
     }
     
-    // Menghentikan semua aktivitas motor secara paksa
     public static void stopAllVibration(Context context) {
+        // 1. Matikan loop paket
+        isTesting = false;
+        if (testThread != null) {
+            testThread.interrupt();
+            testThread = null;
+        }
+
+        // 2. Batalkan getaran pada motor yang di-binding dari dropdown
+        SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
+        String leftBinding = sharedPrefs.getString("vibrator_binding_left", "default");
+        String rightBinding = sharedPrefs.getString("vibrator_binding_right", "default");
+        
+        Vibrator physicalLeft = getVibratorFromBinding(leftBinding);
+        Vibrator physicalRight = getVibratorFromBinding(rightBinding);
+
+        if (physicalLeft != null) physicalLeft.cancel();
+        if (physicalRight != null) physicalRight.cancel();
+
+        // 3. Batalkan motor default
         if (motor1 != null) motor1.cancel();
         if (motor2 != null) motor2.cancel();
         
+        // 4. Batalkan getaran HP
         Vibrator phoneVibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
         if (phoneVibrator != null) phoneVibrator.cancel();
     }
 
-    // Memicu getaran panjang untuk keperluan testing (30 detik)
+    // Memicu pengiriman paket getaran berulang (loop) seperti sistem HD Rumble Switch
     public static void testContinuousVibration(Context context, int leftAmplitude, int rightAmplitude) {
-        // Matikan getaran yang mungkin sedang berjalan
         stopAllVibration(context);
-        
-        SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
-        boolean swapMotors = sharedPrefs.getBoolean("vibrator_swap_motors", false);
-        
-        // Gunakan durasi 30.000 ms (30 detik) alih-alih 80 ms
-        vibrateStereoGamepad(leftAmplitude, rightAmplitude, 30000, context);
+        isTesting = true;
+
+        testThread = new Thread(() -> {
+            while (isTesting) {
+                // Tembakkan paket getaran singkat
+                vibrateStereoGamepad(leftAmplitude, rightAmplitude, 80, context);
+                try {
+                    // Jeda sebentar sebelum mengirim paket berikutnya agar terasa bersambung
+                    Thread.sleep(80); 
+                } catch (InterruptedException e) {
+                    break; // Keluar dari loop jika dihentikan
+                }
+            }
+        });
+        testThread.start();
     }
 
     private static void initMotors() {
-        if (isInitialized) return;
+        // Jika motor1 sudah ada dan masih terkoneksi, tidak perlu memindai ulang
+        if (motor1 != null && motor1.hasVibrator()) {
+            return;
+        }
+
+        // Reset variabel jika perangkat terputus
+        motor1 = null;
+        motor2 = null;
 
         int[] deviceIds = InputDevice.getDeviceIds();
         for (int id : deviceIds) {
@@ -104,20 +139,16 @@ public class GamepadVibrationHelper {
                     int[] motorIds = vManager.getVibratorIds();
                     
                     if (motorIds.length >= 2) {
-                        // Daftarkan motor tanpa asumsi posisi
                         motor1 = vManager.getVibrator(motorIds[0]);
                         motor2 = vManager.getVibrator(motorIds[1]);
-                        isInitialized = true;
                         return;
                     } else if (motorIds.length == 1) {
                         motor1 = vManager.getVibrator(motorIds[0]);
-                        isInitialized = true;
                         return;
                     }
                 }
             }
         }
-        isInitialized = true; 
     }
 
     // Method untuk mengekstrak Vibrator fisik dari string binding (contoh: "34_1")
