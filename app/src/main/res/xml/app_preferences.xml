@@ -71,17 +71,24 @@
             app:min="1" 
             app:showSeekBarValue="true" />
             
-        <Preference
+        <SwitchPreferenceCompat
             android:key="test_vibration_mono"
             android:title="Uji Getaran Mono"
-            android:summary="Ketuk untuk mengetes efek getaran" />
+            android:summary="Aktifkan untuk menguji getaran terus-menerus"
+            android:defaultValue="false" />
 
         <!-- ================ GRUP STEREO ================ -->
-        <SwitchPreferenceCompat
-            android:key="vibrator_swap_motors"
-            android:title="Tukar Posisi Motor Kiri/Kanan"
-            android:summary="Gunakan jika posisi getaran berat dan ringan terbalik"
-            android:defaultValue="false" />
+    	<ListPreference
+            android:key="vibrator_binding_left"
+            android:title="Binding Motor Kiri"
+            android:summary="Pilih fisik vibrator untuk motor kiri"
+            android:defaultValue="default" />
+
+        <ListPreference
+            android:key="vibrator_binding_right"
+            android:title="Binding Motor Kanan"
+            android:summary="Pilih fisik vibrator untuk motor kanan"
+            android:defaultValue="default" />
 
         <SwitchPreferenceCompat
             android:key="vibrator_left_enabled"
@@ -95,9 +102,10 @@
             app:min="1" 
             app:showSeekBarValue="true" />
             
-        <Preference
+        <SwitchPreferenceCompat
             android:key="test_vibration_left"
-            android:title="Uji Motor Kiri" />
+            android:title="Uji Motor Kiri (Terus-menerus)"
+            android:defaultValue="false" />
 
         <SwitchPreferenceCompat
             android:key="vibrator_right_enabled"
@@ -112,9 +120,10 @@
             app:min="1" 
             app:showSeekBarValue="true" />
             
-        <Preference
+        <SwitchPreferenceCompat
             android:key="test_vibration_right"
-            android:title="Uji Motor Kanan" />
+            android:title="Uji Motor Kanan (Terus-menerus)"
+            android:defaultValue="false" />
 
     </PreferenceCategory>
 

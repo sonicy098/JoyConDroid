@@ -26,8 +26,8 @@ public class GamepadVibrationHelper {
         int leftMultRaw = sharedPrefs.getInt(isStereo ? "vibration_multiplier_left" : "vibration_multiplier", 10);
         int rightMultRaw = sharedPrefs.getInt(isStereo ? "vibration_multiplier_right" : "vibration_multiplier", 10);
         
-        float leftMultiplier = leftMultRaw / 10.0f;
-        float rightMultiplier = rightMultRaw / 10.0f;
+        float leftMultiplier = (float) leftMultRaw;
+		float rightMultiplier = (float) rightMultRaw;
         boolean leftEnabled = sharedPrefs.getBoolean("vibrator_left_enabled", true);
         boolean rightEnabled = sharedPrefs.getBoolean("vibrator_right_enabled", true);
         boolean swapMotors = sharedPrefs.getBoolean("vibrator_swap_motors", false);
@@ -59,13 +59,34 @@ public class GamepadVibrationHelper {
             finalRight = Math.min(255, Math.max(0, finalRight));
 
             // Eksekusi getaran (dengan parameter swap)
-            vibrateStereoGamepad(finalLeft, finalRight, 80, swapMotors);
+            vibrateStereoGamepad(finalLeft, finalRight, 80, context);
         } else {
             // Logika bawaan JoyConDroid: Jika rute gamepad dimatikan dari awal, getarkan HP
             int maxAmp = Math.max(leftAmplitude, rightAmplitude);
             VibrationEffect defaultEffect = VibrationEffect.createOneShot(80, maxAmp);
             vibratePhone(context, defaultEffect);
         }
+    }
+    
+    // Menghentikan semua aktivitas motor secara paksa
+    public static void stopAllVibration(Context context) {
+        if (motor1 != null) motor1.cancel();
+        if (motor2 != null) motor2.cancel();
+        
+        Vibrator phoneVibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+        if (phoneVibrator != null) phoneVibrator.cancel();
+    }
+
+    // Memicu getaran panjang untuk keperluan testing (30 detik)
+    public static void testContinuousVibration(Context context, int leftAmplitude, int rightAmplitude) {
+        // Matikan getaran yang mungkin sedang berjalan
+        stopAllVibration(context);
+        
+        SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
+        boolean swapMotors = sharedPrefs.getBoolean("vibrator_swap_motors", false);
+        
+        // Gunakan durasi 30.000 ms (30 detik) alih-alih 80 ms
+        vibrateStereoGamepad(leftAmplitude, rightAmplitude, 30000, context);
     }
 
     private static void initMotors() {
@@ -99,19 +120,43 @@ public class GamepadVibrationHelper {
         isInitialized = true; 
     }
 
-    private static void vibrateStereoGamepad(int leftAmp, int rightAmp, int durationMs, boolean swapMotors) {
-        initMotors();
+    // Method untuk mengekstrak Vibrator fisik dari string binding (contoh: "34_1")
+    private static Vibrator getVibratorFromBinding(String binding) {
+        if (binding == null || binding.equals("default")) return null;
+        try {
+            String[] parts = binding.split("_");
+            int deviceId = Integer.parseInt(parts[0]);
+            int motorId = Integer.parseInt(parts[1]);
 
-        // Tentukan mana fisik motor yang akan dianggap sebagai "Kiri" dan "Kanan"
-        Vibrator physicalLeftMotor = swapMotors ? motor2 : motor1;
-        Vibrator physicalRightMotor = swapMotors ? motor1 : motor2;
+            InputDevice device = InputDevice.getDevice(deviceId);
+            if (device != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                return device.getVibratorManager().getVibrator(motorId);
+            }
+        } catch (Exception e) {
+            // Abaikan error parsing dan kembalikan null
+        }
+        return null;
+    }
 
-        // Tembak getaran ke fisik motor Kiri jika nilainya di atas 0
+    private static void vibrateStereoGamepad(int leftAmp, int rightAmp, int durationMs, Context context) {
+        SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
+        String leftBinding = sharedPrefs.getString("vibrator_binding_left", "default");
+        String rightBinding = sharedPrefs.getString("vibrator_binding_right", "default");
+
+        Vibrator physicalLeftMotor = getVibratorFromBinding(leftBinding);
+        Vibrator physicalRightMotor = getVibratorFromBinding(rightBinding);
+
+        // Jika opsi disetel ke "Otomatis (Default)", gunakan initMotors() standar kita
+        if (physicalLeftMotor == null || physicalRightMotor == null) {
+            initMotors();
+            if (physicalLeftMotor == null) physicalLeftMotor = motor1;
+            if (physicalRightMotor == null) physicalRightMotor = motor2;
+        }
+
         if (physicalLeftMotor != null && physicalLeftMotor.hasVibrator() && leftAmp > 0) {
             physicalLeftMotor.vibrate(VibrationEffect.createOneShot(durationMs, leftAmp));
         }
 
-        // Tembak getaran ke fisik motor Kanan jika nilainya di atas 0
         if (physicalRightMotor != null && physicalRightMotor.hasVibrator() && rightAmp > 0) {
             physicalRightMotor.vibrate(VibrationEffect.createOneShot(durationMs, rightAmp));
         }

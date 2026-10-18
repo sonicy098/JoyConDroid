@@ -16,6 +16,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
 import android.widget.Toast;
+import android.hardware.input.InputManager;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
@@ -58,6 +59,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     private ControllerMemory leftEeprom;
     private ControllerMemory rightEeprom;
     private BluetoothAdapter bluetoothAdapter;
+    private InputManager.InputDeviceListener inputDeviceListener;
 
     private final ActivityResultLauncher<Intent> filePickerLauncher =
             registerForActivityResult(
@@ -115,6 +117,61 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         setupMacAddress();
         setupDeviceName();
         setupGamepadVibrationUI();
+        populateVibratorBindings();
+    }
+    
+    @Override
+    public void onResume() {
+        super.onResume();
+        
+        InputManager inputManager = (InputManager) requireContext().getSystemService(Context.INPUT_SERVICE);
+        if (inputManager != null) {
+            if (inputDeviceListener == null) {
+                inputDeviceListener = new InputManager.InputDeviceListener() {
+                    @Override
+                    public void onInputDeviceAdded(int deviceId) {
+                        populateVibratorBindings();
+                    }
+
+                    @Override
+                    public void onInputDeviceRemoved(int deviceId) {
+                        populateVibratorBindings();
+                    }
+
+                    @Override
+                    public void onInputDeviceChanged(int deviceId) {
+                        populateVibratorBindings();
+                    }
+                };
+            }
+            // Daftarkan listener ke sistem
+            inputManager.registerInputDeviceListener(inputDeviceListener, null);
+        }
+        
+        // Lakukan pemuatan awal untuk berjaga-jaga
+        populateVibratorBindings();
+    }
+    
+    @Override
+    public void onPause() {
+        super.onPause();
+        
+        // 1. Lepaskan pemantauan USB agar tidak membebani baterai di latar belakang
+        InputManager inputManager = (InputManager) requireContext().getSystemService(Context.INPUT_SERVICE);
+        if (inputManager != null && inputDeviceListener != null) {
+            inputManager.unregisterInputDeviceListener(inputDeviceListener);
+        }
+
+        // 2. Hentikan getaran dan matikan sakelar testing jika pengguna keluar
+        com.rdapps.gamepad.vibrator.GamepadVibrationHelper.stopAllVibration(requireContext());
+        
+        androidx.preference.SwitchPreferenceCompat monoTest = findPreference("test_vibration_mono");
+        androidx.preference.SwitchPreferenceCompat leftTest = findPreference("test_vibration_left");
+        androidx.preference.SwitchPreferenceCompat rightTest = findPreference("test_vibration_right");
+        
+        if (monoTest != null) monoTest.setChecked(false);
+        if (leftTest != null) leftTest.setChecked(false);
+        if (rightTest != null) rightTest.setChecked(false);
     }
 
     private void setupAmiiboSwitch() {
@@ -256,20 +313,72 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         });
     }
     
+    private void populateVibratorBindings() {
+        androidx.preference.ListPreference leftBinding = findPreference("vibrator_binding_left");
+        androidx.preference.ListPreference rightBinding = findPreference("vibrator_binding_right");
+
+        if (leftBinding == null || rightBinding == null) return;
+
+        java.util.List<CharSequence> entries = new java.util.ArrayList<>();
+        java.util.List<CharSequence> entryValues = new java.util.ArrayList<>();
+
+        // Opsi bawaan jika pengguna tidak ingin repot memilih
+        entries.add("Otomatis (Default)");
+        entryValues.add("default");
+
+        // Pindai semua perangkat input
+        int[] deviceIds = android.view.InputDevice.getDeviceIds();
+        for (int id : deviceIds) {
+            android.view.InputDevice device = android.view.InputDevice.getDevice(id);
+            if (device != null && (
+                (device.getSources() & android.view.InputDevice.SOURCE_GAMEPAD) == android.view.InputDevice.SOURCE_GAMEPAD || 
+                (device.getSources() & android.view.InputDevice.SOURCE_JOYSTICK) == android.view.InputDevice.SOURCE_JOYSTICK
+            )) {
+                String deviceName = device.getName() + "[" + id + "]";
+                
+                // Gunakan VibratorManager untuk membaca ID motor di Android 12+
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    android.os.VibratorManager vManager = device.getVibratorManager();
+                    int[] motorIds = vManager.getVibratorIds();
+                    
+                    for (int motorId : motorIds) {
+                        entries.add(deviceName + "/Vibrator" + motorId);
+                        entryValues.add(id + "_" + motorId); // Nilai yang disimpan (misal: "34_1")
+                    }
+                }
+            }
+        }
+
+        CharSequence[] entriesArray = entries.toArray(new CharSequence[0]);
+        CharSequence[] entryValuesArray = entryValues.toArray(new CharSequence[0]);
+
+        leftBinding.setEntries(entriesArray);
+        leftBinding.setEntryValues(entryValuesArray);
+        rightBinding.setEntries(entriesArray);
+        rightBinding.setEntryValues(entryValuesArray);
+        
+        // Perbarui summary teks agar menunjukkan pilihan saat ini
+        leftBinding.setSummaryProvider(androidx.preference.ListPreference.SimpleSummaryProvider.getInstance());
+        rightBinding.setSummaryProvider(androidx.preference.ListPreference.SimpleSummaryProvider.getInstance());
+    }
+    
     private void setupGamepadVibrationUI() {
         SwitchPreferenceCompat routePref = findPreference("route_vibration_to_gamepad");
         SwitchPreferenceCompat stereoPref = findPreference("vibration_is_stereo");
 
         Preference monoMult = findPreference("vibration_multiplier");
-        Preference monoTest = findPreference("test_vibration_mono");
-
-        Preference swapPref = findPreference("vibrator_swap_motors");
+        
         Preference leftEnable = findPreference("vibrator_left_enabled");
         Preference leftMult = findPreference("vibration_multiplier_left");
-        Preference leftTest = findPreference("test_vibration_left");
         Preference rightEnable = findPreference("vibrator_right_enabled");
         Preference rightMult = findPreference("vibration_multiplier_right");
-        Preference rightTest = findPreference("test_vibration_right");
+        Preference leftBindingPref = findPreference("vibrator_binding_left");
+		Preference rightBindingPref = findPreference("vibrator_binding_right");
+		
+        // Ambil elemen sebagai SwitchPreferenceCompat
+        SwitchPreferenceCompat monoTest = findPreference("test_vibration_mono");
+        SwitchPreferenceCompat leftTest = findPreference("test_vibration_left");
+        SwitchPreferenceCompat rightTest = findPreference("test_vibration_right");
 
         // Logika penyembunyian UI
         Runnable updateUI = () -> {
@@ -286,13 +395,15 @@ public class SettingsFragment extends PreferenceFragmentCompat {
 
             // Tampilkan Stereo HANYA jika rute aktif DAN stereo aktif
             boolean showStereo = route && stereo;
-            if (swapPref != null) swapPref.setVisible(showStereo);
             if (leftEnable != null) leftEnable.setVisible(showStereo);
             if (leftMult != null) leftMult.setVisible(showStereo);
             if (leftTest != null) leftTest.setVisible(showStereo);
             if (rightEnable != null) rightEnable.setVisible(showStereo);
             if (rightMult != null) rightMult.setVisible(showStereo);
             if (rightTest != null) rightTest.setVisible(showStereo);
+            if (leftBindingPref != null) leftBindingPref.setVisible(showStereo);
+			if (rightBindingPref != null) rightBindingPref.setVisible(showStereo);
+
         };
 
         // Pasang pendengar (listener) agar UI langsung berubah saat sakelar ditekan
@@ -313,26 +424,37 @@ public class SettingsFragment extends PreferenceFragmentCompat {
 
         // Jalankan saat menu pertama kali dibuka
         updateUI.run();
+        
+        // Helper internal untuk mengelola logika klik pada sakelar pengujian
+        androidx.preference.Preference.OnPreferenceChangeListener testListener = (pref, val) -> {
+            boolean isChecked = (Boolean) val;
+            
+            // Matikan semua getaran jika ada yang di-klik
+            com.rdapps.gamepad.vibrator.GamepadVibrationHelper.stopAllVibration(requireContext());
+            
+            // Reset visual sakelar lain agar hanya 1 tes yang hidup di satu waktu
+            if (monoTest != null && pref != monoTest) monoTest.setChecked(false);
+            if (leftTest != null && pref != leftTest) leftTest.setChecked(false);
+            if (rightTest != null && pref != rightTest) rightTest.setChecked(false);
 
-        // Logika Tombol Pengetesan Getaran (Menembak nilai maksimal 255 ke Helper)
-        if (monoTest != null) {
-            monoTest.setOnPreferenceClickListener(pref -> {
-                com.rdapps.gamepad.vibrator.GamepadVibrationHelper.triggerStereoRumble(requireContext(), 255, 255);
-                return true;
-            });
-        }
-        if (leftTest != null) {
-            leftTest.setOnPreferenceClickListener(pref -> {
-                com.rdapps.gamepad.vibrator.GamepadVibrationHelper.triggerStereoRumble(requireContext(), 255, 0);
-                return true;
-            });
-        }
-        if (rightTest != null) {
-            rightTest.setOnPreferenceClickListener(pref -> {
-                com.rdapps.gamepad.vibrator.GamepadVibrationHelper.triggerStereoRumble(requireContext(), 0, 255);
-                return true;
-            });
-        }
+            // Jika dihidupkan, jalankan getaran kontinu sesuai ID yang di-klik
+            if (isChecked) {
+                if (pref == monoTest) {
+                    com.rdapps.gamepad.vibrator.GamepadVibrationHelper.testContinuousVibration(requireContext(), 255, 255);
+                } else if (pref == leftTest) {
+                    com.rdapps.gamepad.vibrator.GamepadVibrationHelper.testContinuousVibration(requireContext(), 255, 0);
+                } else if (pref == rightTest) {
+                    com.rdapps.gamepad.vibrator.GamepadVibrationHelper.testContinuousVibration(requireContext(), 0, 255);
+                }
+            }
+            return true;
+        };
+
+        // Terapkan listener ke ketiga sakelar uji coba
+        if (monoTest != null) monoTest.setOnPreferenceChangeListener(testListener);
+        if (leftTest != null) leftTest.setOnPreferenceChangeListener(testListener);
+        if (rightTest != null) rightTest.setOnPreferenceChangeListener(testListener);
+
     }
 
     private void showColorPicker(ControllerMemory eeprom, boolean isBody, Preference pref) {
