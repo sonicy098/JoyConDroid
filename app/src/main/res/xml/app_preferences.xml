@@ -20,7 +20,8 @@
 	        android:summary="Tingkatkan jika Switch Let's Go Pikachu tidak mendeteksi ayunan (Default: 1)"
 	        android:defaultValue="1"
 	        app:min="1"
-	        android:max="10" />
+	        android:max="10"
+	        app:showSeekBarValue="true" />
 	        
         <SwitchPreferenceCompat
             android:defaultValue="false"
@@ -65,9 +66,11 @@
             android:key="vibration_multiplier"
             android:title="Pengali Kekuatan Mono"
             android:summary="Tingkatkan kekuatan getaran (Default: 10 = 1.0x)"
-            android:defaultValue="10"
-            android:max="30" 
-            app:min="0" /> 
+            android:defaultValue="1"
+            android:max="10" 
+            app:min="1" 
+            app:showSeekBarValue="true" />
+            
         <Preference
             android:key="test_vibration_mono"
             android:title="Uji Getaran Mono"
@@ -87,9 +90,11 @@
         <SeekBarPreference
             android:key="vibration_multiplier_left"
             android:title="Pengali Kekuatan Motor Kiri"
-            android:defaultValue="10"
-            android:max="30"
-            app:min="0" />
+            android:defaultValue="1"
+            android:max="10"
+            app:min="1" 
+            app:showSeekBarValue="true" />
+            
         <Preference
             android:key="test_vibration_left"
             android:title="Uji Motor Kiri" />
@@ -98,12 +103,15 @@
             android:key="vibrator_right_enabled"
             android:title="Aktifkan Motor Kanan (Ringan)"
             android:defaultValue="true" />
+            
         <SeekBarPreference
             android:key="vibration_multiplier_right"
             android:title="Pengali Kekuatan Motor Kanan"
-            android:defaultValue="10"
-            android:max="30"
-            app:min="0" />
+            android:defaultValue="1"
+            android:max="10"
+            app:min="1" 
+            app:showSeekBarValue="true" />
+            
         <Preference
             android:key="test_vibration_right"
             android:title="Uji Motor Kanan" />
