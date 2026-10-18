@@ -2,49 +2,118 @@ package com.rdapps.gamepad.vibrator;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.os.VibratorManager;
 import android.view.InputDevice;
 import androidx.preference.PreferenceManager;
 
 public class GamepadVibrationHelper {
 
-    public static void triggerRumble(Context context, int baseAmplitude) {
+    private static Vibrator motor1 = null;
+    private static Vibrator motor2 = null;
+    private static boolean isInitialized = false;
+
+    public static void triggerStereoRumble(Context context, int leftAmplitude, int rightAmplitude) {
         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
         
-        // Baca pengaturan dari Preferences
+        // Baca pengaturan (kamu bisa menambahkan toggle ini di file preferences XML JoyConDroid nantinya)
         boolean routeToGamepad = sharedPrefs.getBoolean("route_vibration_to_gamepad", false);
-        int multiplierRaw = sharedPrefs.getInt("vibration_multiplier", 10);
-        float multiplier = multiplierRaw / 10.0f;
+        int leftMultRaw = sharedPrefs.getInt(isStereo ? "vibration_multiplier_left" : "vibration_multiplier", 10);
+        int rightMultRaw = sharedPrefs.getInt(isStereo ? "vibration_multiplier_right" : "vibration_multiplier", 10);
+        
+        float leftMultiplier = leftMultRaw / 10.0f;
+        float rightMultiplier = rightMultRaw / 10.0f;
+
+        // Opsi kustomisasi baru
+        boolean isStereo = sharedPrefs.getBoolean("vibration_is_stereo", true);
+        boolean leftEnabled = sharedPrefs.getBoolean("vibrator_left_enabled", true);
+        boolean rightEnabled = sharedPrefs.getBoolean("vibrator_right_enabled", true);
+        boolean swapMotors = sharedPrefs.getBoolean("vibrator_swap_motors", false);
 
         if (routeToGamepad) {
-            // Hitung amplitudo akhir, pastikan tidak melebihi batas 255
-            int finalAmplitude = Math.min(255, Math.max(1, (int) (baseAmplitude * multiplier)));
-            // Buat efek getaran dengan amplitudo baru, durasi sama seperti bawaan JoyConDroid (80ms)
-            VibrationEffect effect = VibrationEffect.createOneShot(80, finalAmplitude);
-            vibrateExternalGamepad(effect);
+            // Jika rute ke gamepad aktif, tapi KEDUA motor sengaja dimatikan pengguna,
+            // buang paketnya dan JANGAN fallback ke HP.
+            if (!leftEnabled && !rightEnabled) {
+                return;
+            }
+
+            // Logika MONO: Gabungkan sinyal dengan mengambil nilai getaran terkuat
+            if (!isStereo) {
+                int maxAmp = Math.max(leftAmplitude, rightAmplitude);
+                leftAmplitude = maxAmp;
+                rightAmplitude = maxAmp;
+            }
+
+            // Terapkan multiplier
+            int finalLeft = (int) (leftAmplitude * leftMultiplier);
+            int finalRight = (int) (rightAmplitude * rightMultiplier);
+
+            // Logika sakelar individu: Jika dimatikan, set amplitudo rute tersebut menjadi 0
+            if (!leftEnabled) finalLeft = 0;
+            if (!rightEnabled) finalRight = 0;
+
+            // Batasi nilai aman (0 - 255)
+            finalLeft = Math.min(255, Math.max(0, finalLeft));
+            finalRight = Math.min(255, Math.max(0, finalRight));
+
+            // Eksekusi getaran (dengan parameter swap)
+            vibrateStereoGamepad(finalLeft, finalRight, 80, swapMotors);
         } else {
-            // Jika toggle mati, getarkan HP seperti biasa menggunakan VibrationPattern bawaan
-            VibrationEffect defaultEffect = VibrationPattern.rumble(baseAmplitude);
+            // Logika bawaan JoyConDroid: Jika rute gamepad dimatikan dari awal, getarkan HP
+            int maxAmp = Math.max(leftAmplitude, rightAmplitude);
+            VibrationEffect defaultEffect = VibrationEffect.createOneShot(80, maxAmp);
             vibratePhone(context, defaultEffect);
         }
     }
 
-    private static void vibrateExternalGamepad(VibrationEffect effect) {
+    private static void initMotors() {
+        if (isInitialized) return;
+
         int[] deviceIds = InputDevice.getDeviceIds();
-        
         for (int id : deviceIds) {
             InputDevice device = InputDevice.getDevice(id);
             if (device != null && (
                 (device.getSources() & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD || 
                 (device.getSources() & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
             )) {
-                Vibrator vibrator = device.getVibrator();
-                if (vibrator != null && vibrator.hasVibrator()) {
-                    vibrator.vibrate(effect);
-                    return; // Berhenti setelah stik pertama digetarkan
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    VibratorManager vManager = device.getVibratorManager();
+                    int[] motorIds = vManager.getVibratorIds();
+                    
+                    if (motorIds.length >= 2) {
+                        // Daftarkan motor tanpa asumsi posisi
+                        motor1 = vManager.getVibrator(motorIds[0]);
+                        motor2 = vManager.getVibrator(motorIds[1]);
+                        isInitialized = true;
+                        return;
+                    } else if (motorIds.length == 1) {
+                        motor1 = vManager.getVibrator(motorIds[0]);
+                        isInitialized = true;
+                        return;
+                    }
                 }
             }
+        }
+        isInitialized = true; 
+    }
+
+    private static void vibrateStereoGamepad(int leftAmp, int rightAmp, int durationMs, boolean swapMotors) {
+        initMotors();
+
+        // Tentukan mana fisik motor yang akan dianggap sebagai "Kiri" dan "Kanan"
+        Vibrator physicalLeftMotor = swapMotors ? motor2 : motor1;
+        Vibrator physicalRightMotor = swapMotors ? motor1 : motor2;
+
+        // Tembak getaran ke fisik motor Kiri jika nilainya di atas 0
+        if (physicalLeftMotor != null && physicalLeftMotor.hasVibrator() && leftAmp > 0) {
+            physicalLeftMotor.vibrate(VibrationEffect.createOneShot(durationMs, leftAmp));
+        }
+
+        // Tembak getaran ke fisik motor Kanan jika nilainya di atas 0
+        if (physicalRightMotor != null && physicalRightMotor.hasVibrator() && rightAmp > 0) {
+            physicalRightMotor.vibrate(VibrationEffect.createOneShot(durationMs, rightAmp));
         }
     }
 

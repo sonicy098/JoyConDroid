@@ -27,6 +27,24 @@ public class RumbleData {
         }
         return Math.max(1, Math.round(amplitude * 255));
     }
+    
+    // Method baru untuk mengambil amplitudo stik Kiri
+    public int getLeftAndroidAmplitude() {
+        float left = decodeChannelAmplitude(rumbleData, 0);
+        if (left <= 0f) {
+            return 0;
+        }
+        return Math.max(1, Math.round(left * 255));
+    }
+
+    // Method baru untuk mengambil amplitudo stik Kanan
+    public int getRightAndroidAmplitude() {
+        float right = decodeChannelAmplitude(rumbleData, 4);
+        if (right <= 0f) {
+            return 0;
+        }
+        return Math.max(1, Math.round(right * 255));
+    }
 
     private static float decodeChannelAmplitude(byte[] data, int offset) {
         int lfAmpByte = data[offset + 3] & 0xFF;

@@ -114,6 +114,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         setupColorPreferences();
         setupMacAddress();
         setupDeviceName();
+        setupGamepadVibrationUI();
     }
 
     private void setupAmiiboSwitch() {
@@ -253,6 +254,85 @@ public class SettingsFragment extends PreferenceFragmentCompat {
 
             return true;
         });
+    }
+    
+    private void setupGamepadVibrationUI() {
+        SwitchPreferenceCompat routePref = findPreference("route_vibration_to_gamepad");
+        SwitchPreferenceCompat stereoPref = findPreference("vibration_is_stereo");
+
+        Preference monoMult = findPreference("vibration_multiplier");
+        Preference monoTest = findPreference("test_vibration_mono");
+
+        Preference swapPref = findPreference("vibrator_swap_motors");
+        Preference leftEnable = findPreference("vibrator_left_enabled");
+        Preference leftMult = findPreference("vibration_multiplier_left");
+        Preference leftTest = findPreference("test_vibration_left");
+        Preference rightEnable = findPreference("vibrator_right_enabled");
+        Preference rightMult = findPreference("vibration_multiplier_right");
+        Preference rightTest = findPreference("test_vibration_right");
+
+        // Logika penyembunyian UI
+        Runnable updateUI = () -> {
+            boolean route = routePref.isChecked();
+            boolean stereo = stereoPref.isChecked();
+
+            // Sembunyikan semua opsi jika rute gamepad dimatikan
+            if (stereoPref != null) stereoPref.setVisible(route);
+
+            // Tampilkan Mono HANYA jika rute aktif DAN stereo mati
+            boolean showMono = route && !stereo;
+            if (monoMult != null) monoMult.setVisible(showMono);
+            if (monoTest != null) monoTest.setVisible(showMono);
+
+            // Tampilkan Stereo HANYA jika rute aktif DAN stereo aktif
+            boolean showStereo = route && stereo;
+            if (swapPref != null) swapPref.setVisible(showStereo);
+            if (leftEnable != null) leftEnable.setVisible(showStereo);
+            if (leftMult != null) leftMult.setVisible(showStereo);
+            if (leftTest != null) leftTest.setVisible(showStereo);
+            if (rightEnable != null) rightEnable.setVisible(showStereo);
+            if (rightMult != null) rightMult.setVisible(showStereo);
+            if (rightTest != null) rightTest.setVisible(showStereo);
+        };
+
+        // Pasang pendengar (listener) agar UI langsung berubah saat sakelar ditekan
+        if (routePref != null) {
+            routePref.setOnPreferenceChangeListener((pref, val) -> {
+                routePref.setChecked((Boolean) val);
+                updateUI.run();
+                return true;
+            });
+        }
+        if (stereoPref != null) {
+            stereoPref.setOnPreferenceChangeListener((pref, val) -> {
+                stereoPref.setChecked((Boolean) val);
+                updateUI.run();
+                return true;
+            });
+        }
+
+        // Jalankan saat menu pertama kali dibuka
+        updateUI.run();
+
+        // Logika Tombol Pengetesan Getaran (Menembak nilai maksimal 255 ke Helper)
+        if (monoTest != null) {
+            monoTest.setOnPreferenceClickListener(pref -> {
+                com.rdapps.gamepad.vibrator.GamepadVibrationHelper.triggerStereoRumble(requireContext(), 255, 255);
+                return true;
+            });
+        }
+        if (leftTest != null) {
+            leftTest.setOnPreferenceClickListener(pref -> {
+                com.rdapps.gamepad.vibrator.GamepadVibrationHelper.triggerStereoRumble(requireContext(), 255, 0);
+                return true;
+            });
+        }
+        if (rightTest != null) {
+            rightTest.setOnPreferenceClickListener(pref -> {
+                com.rdapps.gamepad.vibrator.GamepadVibrationHelper.triggerStereoRumble(requireContext(), 0, 255);
+                return true;
+            });
+        }
     }
 
     private void showColorPicker(ControllerMemory eeprom, boolean isBody, Preference pref) {

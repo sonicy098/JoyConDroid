@@ -263,12 +263,14 @@ public class JoyController extends AbstractDevice {
             return;
         }
         
-        // Nonaktifkan eksekusi getar bawaan HP
-        // listener.rumble(rumbleData.getAndroidAmplitude());
+        // Ambil nilai kiri dan kanan secara terpisah dari RumbleData
+        int leftAmp = rumbleData.getLeftAndroidAmplitude();
+        int rightAmp = rumbleData.getRightAndroidAmplitude();
         
-        // Alihkan eksekusinya ke Helper buatan kita
-        GamepadVibrationHelper.triggerRumble(context, rumbleData.getAndroidAmplitude());
+        // Alihkan eksekusinya ke Helper buatan kita dengan format Stereo
+        GamepadVibrationHelper.triggerStereoRumble(context, leftAmp, rightAmp);
     }
+
 
 
     @Override
