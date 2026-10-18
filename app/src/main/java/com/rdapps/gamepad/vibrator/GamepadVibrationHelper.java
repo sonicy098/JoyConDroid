@@ -20,14 +20,14 @@ public class GamepadVibrationHelper {
         
         // Baca pengaturan (kamu bisa menambahkan toggle ini di file preferences XML JoyConDroid nantinya)
         boolean routeToGamepad = sharedPrefs.getBoolean("route_vibration_to_gamepad", false);
+
+        // Opsi kustomisasi baru
+        boolean isStereo = sharedPrefs.getBoolean("vibration_is_stereo", true);
         int leftMultRaw = sharedPrefs.getInt(isStereo ? "vibration_multiplier_left" : "vibration_multiplier", 10);
         int rightMultRaw = sharedPrefs.getInt(isStereo ? "vibration_multiplier_right" : "vibration_multiplier", 10);
         
         float leftMultiplier = leftMultRaw / 10.0f;
         float rightMultiplier = rightMultRaw / 10.0f;
-
-        // Opsi kustomisasi baru
-        boolean isStereo = sharedPrefs.getBoolean("vibration_is_stereo", true);
         boolean leftEnabled = sharedPrefs.getBoolean("vibrator_left_enabled", true);
         boolean rightEnabled = sharedPrefs.getBoolean("vibrator_right_enabled", true);
         boolean swapMotors = sharedPrefs.getBoolean("vibrator_swap_motors", false);
