@@ -357,10 +357,19 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         rightBinding.setEntries(entriesArray);
         rightBinding.setEntryValues(entryValuesArray);
         
-        // PENTING: Panggil helper agar sistem melakukan "Auto-Bind" jika ID lama hilang dicabut
+        // 1. Panggil Helper agar mengeksekusi Auto-Bind (menyimpan ID baru ke SharedPreferences)
         com.rdapps.gamepad.vibrator.GamepadVibrationHelper.checkAndAutoBind(requireContext());
         
-        // Perbarui ringkasan di UI
+        // 2. BACA KEMBALI nilai terbaru dari SharedPreferences setelah Auto-Bind dilakukan
+        android.content.SharedPreferences sharedPrefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(requireContext());
+        String currentLeft = sharedPrefs.getString("vibrator_binding_left", "");
+        String currentRight = sharedPrefs.getString("vibrator_binding_right", "");
+        
+        // 3. PAKSA UI (Dropdown) untuk melompat ke nilai yang terpilih
+        leftBinding.setValue(currentLeft);
+        rightBinding.setValue(currentRight);
+        
+        // 4. Perbarui teks ringkasan (Summary) di UI agar menampilkan nama perangkat
         leftBinding.setSummaryProvider(androidx.preference.ListPreference.SimpleSummaryProvider.getInstance());
         rightBinding.setSummaryProvider(androidx.preference.ListPreference.SimpleSummaryProvider.getInstance());
     }
