@@ -6,6 +6,7 @@ import android.os.Build;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.os.VibratorManager;
+import android.os.CombinedVibration;
 import android.view.InputDevice;
 import androidx.preference.PreferenceManager;
 
@@ -16,7 +17,10 @@ public class GamepadVibrationHelper {
     private static Thread testThread = null;
     private static long lastVibrationTime = 0;
     // Batas aman: abaikan paket baru jika jaraknya kurang dari 40ms (~25 kali/detik)
-    private static final int THROTTLE_INTERVAL_MS = 40; 
+    private static final int THROTTLE_INTERVAL_MS = 40;
+    private static int defaultDeviceId = -1;
+    private static int defaultLeftMotorId = -1;
+    private static int defaultRightMotorId = -1;
     private static volatile boolean isTesting = false;
 
     public static void triggerStereoRumble(Context context, int leftAmplitude, int rightAmplitude) {
@@ -139,14 +143,15 @@ public class GamepadVibrationHelper {
     }
 
     private static void initMotors() {
-        // Jika motor1 sudah ada dan masih terkoneksi, tidak perlu memindai ulang
         if (motor1 != null && motor1.hasVibrator()) {
             return;
         }
 
-        // Reset variabel jika perangkat terputus
         motor1 = null;
         motor2 = null;
+        defaultDeviceId = -1;
+        defaultLeftMotorId = -1;
+        defaultRightMotorId = -1;
 
         int[] deviceIds = InputDevice.getDeviceIds();
         for (int id : deviceIds) {
@@ -160,10 +165,15 @@ public class GamepadVibrationHelper {
                     int[] motorIds = vManager.getVibratorIds();
                     
                     if (motorIds.length >= 2) {
+                        defaultDeviceId = id;
+                        defaultLeftMotorId = motorIds[0];
+                        defaultRightMotorId = motorIds[1];
                         motor1 = vManager.getVibrator(motorIds[0]);
                         motor2 = vManager.getVibrator(motorIds[1]);
                         return;
                     } else if (motorIds.length == 1) {
+                        defaultDeviceId = id;
+                        defaultLeftMotorId = motorIds[0];
                         motor1 = vManager.getVibrator(motorIds[0]);
                         return;
                     }
@@ -171,6 +181,7 @@ public class GamepadVibrationHelper {
             }
         }
     }
+
 
     // Method untuk mengekstrak Vibrator fisik dari string binding (contoh: "34_1")
     private static Vibrator getVibratorFromBinding(String binding) {
@@ -195,24 +206,84 @@ public class GamepadVibrationHelper {
         String leftBinding = sharedPrefs.getString("vibrator_binding_left", "default");
         String rightBinding = sharedPrefs.getString("vibrator_binding_right", "default");
 
-        Vibrator physicalLeftMotor = getVibratorFromBinding(leftBinding);
-        Vibrator physicalRightMotor = getVibratorFromBinding(rightBinding);
+        int leftDeviceId = -1, leftMotorId = -1;
+        int rightDeviceId = -1, rightMotorId = -1;
 
-        // Jika opsi disetel ke "Otomatis (Default)", gunakan initMotors() standar kita
-        if (physicalLeftMotor == null || physicalRightMotor == null) {
+        // 1. Ekstrak ID Kiri
+        if (leftBinding.equals("default")) {
             initMotors();
-            if (physicalLeftMotor == null) physicalLeftMotor = motor1;
-            if (physicalRightMotor == null) physicalRightMotor = motor2;
+            leftDeviceId = defaultDeviceId;
+            leftMotorId = defaultLeftMotorId;
+        } else {
+            try {
+                String[] parts = leftBinding.split("_");
+                leftDeviceId = Integer.parseInt(parts[0]);
+                leftMotorId = Integer.parseInt(parts[1]);
+            } catch (Exception ignored) {}
         }
 
-        if (physicalLeftMotor != null && physicalLeftMotor.hasVibrator() && leftAmp > 0) {
-            physicalLeftMotor.vibrate(VibrationEffect.createOneShot(durationMs, leftAmp));
+        // 2. Ekstrak ID Kanan
+        if (rightBinding.equals("default")) {
+            initMotors();
+            rightDeviceId = defaultDeviceId;
+            rightMotorId = defaultRightMotorId;
+        } else {
+            try {
+                String[] parts = rightBinding.split("_");
+                rightDeviceId = Integer.parseInt(parts[0]);
+                rightMotorId = Integer.parseInt(parts[1]);
+            } catch (Exception ignored) {}
         }
 
-        if (physicalRightMotor != null && physicalRightMotor.hasVibrator() && rightAmp > 0) {
-            physicalRightMotor.vibrate(VibrationEffect.createOneShot(durationMs, rightAmp));
+        // =========================================================
+        // JALUR MODERN: API CombinedVibration (Anti Kebocoran Sinyal)
+        // =========================================================
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && leftDeviceId != -1 && leftDeviceId == rightDeviceId) {
+            InputDevice device = InputDevice.getDevice(leftDeviceId);
+            if (device != null) {
+                VibratorManager vManager = device.getVibratorManager();
+                CombinedVibration.ParallelCombination combo = CombinedVibration.startParallel();
+                boolean hasSignal = false;
+                
+                if (leftAmp > 0 && leftMotorId != -1) {
+                    combo.addVibrator(leftMotorId, VibrationEffect.createOneShot(durationMs, leftAmp));
+                    hasSignal = true;
+                }
+                if (rightAmp > 0 && rightMotorId != -1) {
+                    combo.addVibrator(rightMotorId, VibrationEffect.createOneShot(durationMs, rightAmp));
+                    hasSignal = true;
+                }
+                
+                // Eksekusi secara simultan dan paksa kunci ke ID masing-masing
+                if (hasSignal) {
+                    vManager.vibrate(combo.combine());
+                } else {
+                    vManager.cancel();
+                }
+                return; // Keluar, jangan eksekusi jalur lama
+            }
+        }
+
+        // =========================================================
+        // JALUR LAMA: Fallback (Jika beda gamepad atau Android 11 ke bawah)
+        // =========================================================
+        Vibrator physicalLeftMotor = getVibratorFromBinding(leftBinding);
+        if (physicalLeftMotor == null) physicalLeftMotor = motor1;
+        
+        Vibrator physicalRightMotor = getVibratorFromBinding(rightBinding);
+        if (physicalRightMotor == null) physicalRightMotor = motor2;
+
+        if (physicalLeftMotor != null && physicalLeftMotor.hasVibrator()) {
+            if (leftAmp > 0) physicalLeftMotor.vibrate(VibrationEffect.createOneShot(durationMs, leftAmp));
+            else physicalLeftMotor.cancel();
+        }
+
+        if (physicalRightMotor != null && physicalRightMotor.hasVibrator()) {
+            if (rightAmp > 0) physicalRightMotor.vibrate(VibrationEffect.createOneShot(durationMs, rightAmp));
+            else physicalRightMotor.cancel();
         }
     }
+
 
     private static void vibratePhone(Context context, VibrationEffect effect) {
         Vibrator vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
