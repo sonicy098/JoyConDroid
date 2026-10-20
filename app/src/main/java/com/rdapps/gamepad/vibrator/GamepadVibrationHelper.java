@@ -14,9 +14,21 @@ public class GamepadVibrationHelper {
     private static Vibrator motor1 = null;
     private static Vibrator motor2 = null;
     private static Thread testThread = null;
+    private static long lastVibrationTime = 0;
+    // Batas aman: abaikan paket baru jika jaraknya kurang dari 40ms (~25 kali/detik)
+    private static final int THROTTLE_INTERVAL_MS = 40; 
     private static volatile boolean isTesting = false;
 
     public static void triggerStereoRumble(Context context, int leftAmplitude, int rightAmplitude) {
+    	long currentTime = System.currentTimeMillis();
+        boolean isStopCommand = (leftAmplitude == 0 && rightAmplitude == 0);
+
+        // FITUR FILTER: Buang paket jika terlalu rapat, TAPI biarkan perintah "berhenti" lolos
+        if (!isStopCommand && (currentTime - lastVibrationTime < THROTTLE_INTERVAL_MS)) {
+            return; 
+        }
+        lastVibrationTime = currentTime;
+
         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
         
         // Baca pengaturan (kamu bisa menambahkan toggle ini di file preferences XML JoyConDroid nantinya)
@@ -113,13 +125,13 @@ public class GamepadVibrationHelper {
 
         testThread = new Thread(() -> {
             while (isTesting) {
-                // Tembakkan paket getaran singkat
-                vibrateStereoGamepad(leftAmplitude, rightAmplitude, 80, context);
+                // Beri getaran 150ms
+                vibrateStereoGamepad(leftAmplitude, rightAmplitude, 150, context);
                 try {
-                    // Jeda sebentar sebelum mengirim paket berikutnya agar terasa bersambung
-                    Thread.sleep(80); 
+                    // Beri jeda 350ms (total siklus 500ms/setengah detik) agar watchdog aman
+                    Thread.sleep(350); 
                 } catch (InterruptedException e) {
-                    break; // Keluar dari loop jika dihentikan
+                    break;
                 }
             }
         });
