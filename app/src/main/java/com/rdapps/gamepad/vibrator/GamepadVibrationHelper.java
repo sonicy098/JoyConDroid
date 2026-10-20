@@ -136,7 +136,7 @@ public class GamepadVibrationHelper {
     }
 
     // =========================================================
-    // FITUR CERDAS: AUTO-BIND MOTOR SETELAH UNPLUG-REPLUG
+    // FITUR CERDAS: AUTO-BIND MOTOR SETELAH UNPLUG-REPLUG (MENGINGAT PILIHAN)
     // =========================================================
     public static void checkAndAutoBind(Context context) {
         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
@@ -148,7 +148,24 @@ public class GamepadVibrationHelper {
             return; 
         }
 
-        // Jika sudah dicabut/stale, mari cari Gamepad baru dan binding otomatis
+        // --- FITUR BARU: Ekstrak preferensi ID motor lama sebelum ditimpa ---
+        int preferredLeftMotor = 0; // Default pabrik
+        int preferredRightMotor = 1; // Default pabrik
+
+        try {
+            if (!leftBinding.isEmpty() && leftBinding.contains("_")) {
+                preferredLeftMotor = Integer.parseInt(leftBinding.split("_")[1]);
+            }
+        } catch (Exception ignored) {}
+
+        try {
+            if (!rightBinding.isEmpty() && rightBinding.contains("_")) {
+                preferredRightMotor = Integer.parseInt(rightBinding.split("_")[1]);
+            }
+        } catch (Exception ignored) {}
+        // --------------------------------------------------------------------
+
+        // Jika sudah dicabut/stale, cari Gamepad baru dan pasang binding otomatis
         int[] deviceIds = InputDevice.getDeviceIds();
         for (int id : deviceIds) {
             InputDevice device = InputDevice.getDevice(id);
@@ -160,9 +177,21 @@ public class GamepadVibrationHelper {
                     VibratorManager vManager = device.getVibratorManager();
                     int[] motorIds = vManager.getVibratorIds();
                     if (motorIds.length > 0) {
-                        // Otomatis memilih motor pertama (0) untuk kiri, motor kedua (1) untuk kanan
-                        String newLeft = id + "_" + motorIds[0];
-                        String newRight = id + "_" + (motorIds.length > 1 ? motorIds[1] : motorIds[0]);
+                        
+                        // Validasi apakah motor id favorit pengguna ADA di gamepad ini
+                        boolean hasPrefLeft = false, hasPrefRight = false;
+                        for (int mId : motorIds) {
+                            if (mId == preferredLeftMotor) hasPrefLeft = true;
+                            if (mId == preferredRightMotor) hasPrefRight = true;
+                        }
+
+                        // Gunakan motor pilihan jika ada, jika tidak kembali ke default 0 dan 1
+                        int finalLeftMotor = hasPrefLeft ? preferredLeftMotor : motorIds[0];
+                        int finalRightMotor = hasPrefRight ? preferredRightMotor : (motorIds.length > 1 ? motorIds[1] : motorIds[0]);
+
+                        // Gabungkan Device ID baru dengan Motor ID yang sudah diingat
+                        String newLeft = id + "_" + finalLeftMotor;
+                        String newRight = id + "_" + finalRightMotor;
                         
                         // Timpa memori penyimpanan agar UI langsung terupdate
                         sharedPrefs.edit()
