@@ -102,37 +102,30 @@ public class GamepadVibrationHelper {
             testThread = null;
         }
 
-        // 2. Batalkan getaran pada motor yang di-binding dari dropdown
+        // 2. Batalkan getaran pada motor yang tersimpan
         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
-        String leftBinding = sharedPrefs.getString("vibrator_binding_left", "default");
-        String rightBinding = sharedPrefs.getString("vibrator_binding_right", "default");
+        String leftBinding = sharedPrefs.getString("vibrator_binding_left", "");
+        String rightBinding = sharedPrefs.getString("vibrator_binding_right", "");
         
         Vibrator physicalLeft = getVibratorFromBinding(leftBinding);
         Vibrator physicalRight = getVibratorFromBinding(rightBinding);
 
         if (physicalLeft != null) physicalLeft.cancel();
         if (physicalRight != null) physicalRight.cancel();
-
-        // 3. Batalkan motor default
-        if (motor1 != null) motor1.cancel();
-        if (motor2 != null) motor2.cancel();
         
-        // 4. Batalkan getaran HP
+        // 3. Batalkan getaran HP
         Vibrator phoneVibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
         if (phoneVibrator != null) phoneVibrator.cancel();
     }
 
-    // Memicu pengiriman paket getaran berulang (loop) seperti sistem HD Rumble Switch
     public static void testContinuousVibration(Context context, int leftAmplitude, int rightAmplitude) {
         stopAllVibration(context);
         isTesting = true;
 
         testThread = new Thread(() -> {
             while (isTesting) {
-                // Beri getaran 150ms
                 vibrateStereoGamepad(leftAmplitude, rightAmplitude, 80, context);
                 try {
-                    // Beri jeda 350ms (total siklus 500ms/setengah detik) agar watchdog aman
                     Thread.sleep(80); 
                 } catch (InterruptedException e) {
                     break;
@@ -142,17 +135,20 @@ public class GamepadVibrationHelper {
         testThread.start();
     }
 
-    private static void initMotors() {
-        if (motor1 != null && motor1.hasVibrator()) {
-            return;
+    // =========================================================
+    // FITUR CERDAS: AUTO-BIND MOTOR SETELAH UNPLUG-REPLUG
+    // =========================================================
+    public static void checkAndAutoBind(Context context) {
+        SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
+        String leftBinding = sharedPrefs.getString("vibrator_binding_left", "");
+        String rightBinding = sharedPrefs.getString("vibrator_binding_right", "");
+
+        // Jika settingan manual pengguna MASIH TERSAMBUNG, biarkan! Jangan diganggu.
+        if (isBindingValid(leftBinding) && isBindingValid(rightBinding)) {
+            return; 
         }
 
-        motor1 = null;
-        motor2 = null;
-        defaultDeviceId = -1;
-        defaultLeftMotorId = -1;
-        defaultRightMotorId = -1;
-
+        // Jika sudah dicabut/stale, mari cari Gamepad baru dan binding otomatis
         int[] deviceIds = InputDevice.getDeviceIds();
         for (int id : deviceIds) {
             InputDevice device = InputDevice.getDevice(id);
@@ -163,29 +159,37 @@ public class GamepadVibrationHelper {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     VibratorManager vManager = device.getVibratorManager();
                     int[] motorIds = vManager.getVibratorIds();
-                    
-                    if (motorIds.length >= 2) {
-                        defaultDeviceId = id;
-                        defaultLeftMotorId = motorIds[0];
-                        defaultRightMotorId = motorIds[1];
-                        motor1 = vManager.getVibrator(motorIds[0]);
-                        motor2 = vManager.getVibrator(motorIds[1]);
-                        return;
-                    } else if (motorIds.length == 1) {
-                        defaultDeviceId = id;
-                        defaultLeftMotorId = motorIds[0];
-                        motor1 = vManager.getVibrator(motorIds[0]);
-                        return;
+                    if (motorIds.length > 0) {
+                        // Otomatis memilih motor pertama (0) untuk kiri, motor kedua (1) untuk kanan
+                        String newLeft = id + "_" + motorIds[0];
+                        String newRight = id + "_" + (motorIds.length > 1 ? motorIds[1] : motorIds[0]);
+                        
+                        // Timpa memori penyimpanan agar UI langsung terupdate
+                        sharedPrefs.edit()
+                            .putString("vibrator_binding_left", newLeft)
+                            .putString("vibrator_binding_right", newRight)
+                            .apply();
+                        return; // Auto-Bind sukses, keluar
                     }
                 }
             }
         }
     }
 
+    private static boolean isBindingValid(String binding) {
+        if (binding == null || binding.isEmpty() || binding.equals("default")) return false;
+        try {
+            String[] parts = binding.split("_");
+            int deviceId = Integer.parseInt(parts[0]);
+            InputDevice device = InputDevice.getDevice(deviceId);
+            return device != null; // Selama devicenya belum dicabut, anggap valid
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
-    // Method untuk mengekstrak Vibrator fisik dari string binding (contoh: "34_1")
     private static Vibrator getVibratorFromBinding(String binding) {
-        if (binding == null || binding.equals("default")) return null;
+        if (binding == null || binding.isEmpty()) return null;
         try {
             String[] parts = binding.split("_");
             int deviceId = Integer.parseInt(parts[0]);
@@ -195,48 +199,35 @@ public class GamepadVibrationHelper {
             if (device != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 return device.getVibratorManager().getVibrator(motorId);
             }
-        } catch (Exception e) {
-            // Abaikan error parsing dan kembalikan null
-        }
+        } catch (Exception ignored) {}
         return null;
     }
 
     private static void vibrateStereoGamepad(int leftAmp, int rightAmp, int durationMs, Context context) {
+        // PENTING: Periksa sebelum bergetar. Jika stik baru dicolok, otomatis pasang binding!
+        checkAndAutoBind(context);
+
         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
-        String leftBinding = sharedPrefs.getString("vibrator_binding_left", "default");
-        String rightBinding = sharedPrefs.getString("vibrator_binding_right", "default");
+        String leftBinding = sharedPrefs.getString("vibrator_binding_left", "");
+        String rightBinding = sharedPrefs.getString("vibrator_binding_right", "");
 
         int leftDeviceId = -1, leftMotorId = -1;
         int rightDeviceId = -1, rightMotorId = -1;
 
-        // 1. Ekstrak ID Kiri
-        if (leftBinding.equals("default")) {
-            initMotors();
-            leftDeviceId = defaultDeviceId;
-            leftMotorId = defaultLeftMotorId;
-        } else {
-            try {
-                String[] parts = leftBinding.split("_");
-                leftDeviceId = Integer.parseInt(parts[0]);
-                leftMotorId = Integer.parseInt(parts[1]);
-            } catch (Exception ignored) {}
-        }
+        try {
+            String[] parts = leftBinding.split("_");
+            leftDeviceId = Integer.parseInt(parts[0]);
+            leftMotorId = Integer.parseInt(parts[1]);
+        } catch (Exception ignored) {}
 
-        // 2. Ekstrak ID Kanan
-        if (rightBinding.equals("default")) {
-            initMotors();
-            rightDeviceId = defaultDeviceId;
-            rightMotorId = defaultRightMotorId;
-        } else {
-            try {
-                String[] parts = rightBinding.split("_");
-                rightDeviceId = Integer.parseInt(parts[0]);
-                rightMotorId = Integer.parseInt(parts[1]);
-            } catch (Exception ignored) {}
-        }
+        try {
+            String[] parts = rightBinding.split("_");
+            rightDeviceId = Integer.parseInt(parts[0]);
+            rightMotorId = Integer.parseInt(parts[1]);
+        } catch (Exception ignored) {}
 
         // =========================================================
-        // JALUR MODERN: API CombinedVibration (Anti Kebocoran Sinyal)
+        // JALUR MODERN API (CombinedVibration Anti Kebocoran)
         // =========================================================
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && leftDeviceId != -1 && leftDeviceId == rightDeviceId) {
             InputDevice device = InputDevice.getDevice(leftDeviceId);
@@ -254,24 +245,23 @@ public class GamepadVibrationHelper {
                     hasSignal = true;
                 }
                 
-                // Eksekusi secara simultan dan paksa kunci ke ID masing-masing
                 if (hasSignal) {
                     vManager.vibrate(combo.combine());
+                    // Paksa matikan motor spesifik jika amplitudonya 0 agar tidak nyangkut dari sebelumnya
+                    if (leftAmp == 0 && leftMotorId != -1) vManager.getVibrator(leftMotorId).cancel();
+                    if (rightAmp == 0 && rightMotorId != -1) vManager.getVibrator(rightMotorId).cancel();
                 } else {
                     vManager.cancel();
                 }
-                return; // Keluar, jangan eksekusi jalur lama
+                return; 
             }
         }
 
         // =========================================================
-        // JALUR LAMA: Fallback (Jika beda gamepad atau Android 11 ke bawah)
+        // JALUR FALLBACK (Beda Device)
         // =========================================================
         Vibrator physicalLeftMotor = getVibratorFromBinding(leftBinding);
-        if (physicalLeftMotor == null) physicalLeftMotor = motor1;
-        
         Vibrator physicalRightMotor = getVibratorFromBinding(rightBinding);
-        if (physicalRightMotor == null) physicalRightMotor = motor2;
 
         if (physicalLeftMotor != null && physicalLeftMotor.hasVibrator()) {
             if (leftAmp > 0) physicalLeftMotor.vibrate(VibrationEffect.createOneShot(durationMs, leftAmp));
@@ -283,7 +273,6 @@ public class GamepadVibrationHelper {
             else physicalRightMotor.cancel();
         }
     }
-
 
     private static void vibratePhone(Context context, VibrationEffect effect) {
         Vibrator vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);

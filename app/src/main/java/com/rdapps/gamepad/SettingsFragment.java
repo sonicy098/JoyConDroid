@@ -322,11 +322,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         java.util.List<CharSequence> entries = new java.util.ArrayList<>();
         java.util.List<CharSequence> entryValues = new java.util.ArrayList<>();
 
-        // Opsi bawaan jika pengguna tidak ingin repot memilih
-        entries.add("Otomatis (Default)");
-        entryValues.add("default");
-
-        // Pindai semua perangkat input
+        // Pindai semua perangkat input secara real-time
         int[] deviceIds = android.view.InputDevice.getDeviceIds();
         for (int id : deviceIds) {
             android.view.InputDevice device = android.view.InputDevice.getDevice(id);
@@ -334,19 +330,23 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                 (device.getSources() & android.view.InputDevice.SOURCE_GAMEPAD) == android.view.InputDevice.SOURCE_GAMEPAD || 
                 (device.getSources() & android.view.InputDevice.SOURCE_JOYSTICK) == android.view.InputDevice.SOURCE_JOYSTICK
             )) {
-                String deviceName = device.getName() + "[" + id + "]";
+                String deviceName = device.getName() + " [ID " + id + "]";
                 
-                // Gunakan VibratorManager untuk membaca ID motor di Android 12+
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                     android.os.VibratorManager vManager = device.getVibratorManager();
                     int[] motorIds = vManager.getVibratorIds();
                     
                     for (int motorId : motorIds) {
-                        entries.add(deviceName + "/Vibrator" + motorId);
-                        entryValues.add(id + "_" + motorId); // Nilai yang disimpan (misal: "34_1")
+                        entries.add(deviceName + " - Motor " + motorId);
+                        entryValues.add(id + "_" + motorId); // Nilai riil yang disimpan
                     }
                 }
             }
+        }
+
+        if (entries.isEmpty()) {
+            entries.add("Tidak ada perangkat terdeteksi");
+            entryValues.add("");
         }
 
         CharSequence[] entriesArray = entries.toArray(new CharSequence[0]);
@@ -357,11 +357,14 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         rightBinding.setEntries(entriesArray);
         rightBinding.setEntryValues(entryValuesArray);
         
-        // Perbarui summary teks agar menunjukkan pilihan saat ini
+        // PENTING: Panggil helper agar sistem melakukan "Auto-Bind" jika ID lama hilang dicabut
+        com.rdapps.gamepad.vibrator.GamepadVibrationHelper.checkAndAutoBind(requireContext());
+        
+        // Perbarui ringkasan di UI
         leftBinding.setSummaryProvider(androidx.preference.ListPreference.SimpleSummaryProvider.getInstance());
         rightBinding.setSummaryProvider(androidx.preference.ListPreference.SimpleSummaryProvider.getInstance());
     }
-    
+
     private void setupGamepadVibrationUI() {
         SwitchPreferenceCompat routePref = findPreference("route_vibration_to_gamepad");
         SwitchPreferenceCompat stereoPref = findPreference("vibration_is_stereo");
