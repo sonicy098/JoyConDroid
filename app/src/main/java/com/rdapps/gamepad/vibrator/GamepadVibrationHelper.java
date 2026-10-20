@@ -61,12 +61,21 @@ public class GamepadVibrationHelper {
 
             // Eksekusi getaran (dengan parameter swap)
             vibrateStereoGamepad(finalLeft, finalRight, 80, context);
-        } else {
+		} else {
             // Logika bawaan JoyConDroid: Jika rute gamepad dimatikan dari awal, getarkan HP
             int maxAmp = Math.max(leftAmplitude, rightAmplitude);
-            VibrationEffect defaultEffect = VibrationEffect.createOneShot(80, maxAmp);
-            vibratePhone(context, defaultEffect);
+            
+            // CEGAH CRASH: Hanya buat VibrationEffect jika amplitudo di atas 0
+            if (maxAmp > 0) {
+                VibrationEffect defaultEffect = VibrationEffect.createOneShot(80, maxAmp);
+                vibratePhone(context, defaultEffect);
+            } else {
+                // Jika 0, batalkan getaran HP
+                Vibrator phoneVibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+                if (phoneVibrator != null) phoneVibrator.cancel();
+            }
         }
+
     }
     
     public static void stopAllVibration(Context context) {
