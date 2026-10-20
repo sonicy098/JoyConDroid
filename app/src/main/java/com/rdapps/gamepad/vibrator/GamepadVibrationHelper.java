@@ -126,10 +126,10 @@ public class GamepadVibrationHelper {
         testThread = new Thread(() -> {
             while (isTesting) {
                 // Beri getaran 150ms
-                vibrateStereoGamepad(leftAmplitude, rightAmplitude, 150, context);
+                vibrateStereoGamepad(leftAmplitude, rightAmplitude, 80, context);
                 try {
                     // Beri jeda 350ms (total siklus 500ms/setengah detik) agar watchdog aman
-                    Thread.sleep(350); 
+                    Thread.sleep(80); 
                 } catch (InterruptedException e) {
                     break;
                 }
